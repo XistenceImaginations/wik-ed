@@ -1,0 +1,91 @@
+<template id="style-entry" lang="ccss">
+  * >> box-sizing: border-box
+  [contenteditable] >> outline: 0px solid transparent
+  :host
+    display: flex
+    flex-direction: column
+    --entryHeight: 250px
+  .--marked >> background: hsl(60deg 100% 50% / .25)
+  .--indented
+    margin: 0
+    padding-left: 1em
+  .--boxed
+    margin: 0
+    padding: 1em
+    border: 1px solid hsl(60deg 0% 100% / .25)
+  a >> color: white
+  h1 >> margin: 0.5em 0
+  h2 >> margin: 0.5em 0
+  h3 >> margin: 0.25em 0
+  h4 >> margin: 0.25em 0
+  h5 >> margin: 0.125em 0
+  h6 >> margin: 0.125em 0
+  article
+    padding: 1em
+    display: flex
+    flex-direction: column
+    width: 100%
+    margin-bottom: 2em
+    background-color: hsl(0 0% 100% / .03)
+    border-radius: .25em
+    backdrop-filter: blur(1em)
+    animation-duration: .5s
+    animation-fill-mode: forwards
+    flex-basis: 0
+    //box-shadow: inset 0 0 10px hsl(0 0% 100% / .25), inset 0 0 0 1px hsl(0 0% 100% / .25)
+    box-shadow: inset 0 0 10px hsl(0 0% 100% / .01), inset 0 0 0 1px hsl(0 0% 100% / .05)
+    margin-bottom: 0
+    padding: 0 1em
+    flex-basis: 0
+    opacity: 0
+    min-height: min-content
+    transition: all .5s
+  article>div
+    flex: 1
+    margin-left: 1em
+  article>div:empty::before
+    pointer-events: none
+    content: 'Enter some text'
+    color: currentColor
+    opacity: .5
+  article>h3
+    margin: 0 0 .5em 0
+    border-bottom: 1px solid hsl(0deg 0% 100% / .1)
+    display: inline-flex
+  article>h3>#close
+    width: 32px
+    height: 32px
+    display: flex
+    justify-content: center
+    align-items: center
+  article>h3>.icon >> cursor: pointer
+  article>h3>#title >> flex: 1
+  article>h3>#meta >> flex: 0
+  article>h3>#title:empty::before
+    pointer-events: none
+    content: 'Enter a title'
+    color: currentColor
+    opacity: .5  
+  @keyframes fadeIn
+    0%
+      margin-bottom: 0
+      padding: 0 1em
+      flex-basis: 0
+      opacity: 0
+    100%
+      margin-bottom: 2em
+      padding: 1em
+      flex-basis: var(--entryHeight)
+      opacity: 1
+  @keyframes fadeOut
+    0%
+      margin-bottom: 2em
+      padding: 1em
+      flex-basis: var(--entryHeight)
+      opacity: 1
+    100%
+      margin-bottom: 0
+      padding: 0 1em
+      flex-basis: 0
+      opacity: 0
+</template>

@@ -1,0 +1,53 @@
+<script id="script-md-parser">
+  // Register module.
+  ($$?.modules||{})['markdown'] = class MDParser {
+    static replace(regex, text, start, end, startCrop, endCrop) {
+      let output = text;
+      // Get all matches for 'regex'.
+      [...text.matchAll(regex)]
+        // Due to string manipulation we iterate the matches from last to
+        //  first, otherwise we have to remember an offset as manipulating
+        //  the string will change the indices of all following matches.
+        .reverse()
+        // Handle each match.
+        .forEach(match => {
+          // The 'start'-definition can be a simple string or a function
+          //  returning a string or array of strings. If it is an array
+          //  it is expected that the first entry is the startTag to render
+          //  and the second (optional) entry the content to render between
+          //  the tags.
+          let data = (typeof start === 'function' ? start(match) : start);
+          let startTag = Array.isArray(data) ? data[0] || '???' : data;
+          let content = Array.isArray(data) ? data[1] || '???' : output.substring(match.index + startCrop, match.index + match[0].length - endCrop);
+          let endTag = end;
+
+          output = output.substring(0, match.index) +
+                   startTag + content + endTag +
+                   output.substring(match.index + match[0].length)
+        });
+      return output;
+    }
+
+    static parse(text) {
+      let html = text;
+      html = MDParser.replace(/^######(.*$)/gim, html, '<h6>', '</h6>', 6, 0);
+      html = MDParser.replace(/^#####(.*$)/gim, html, '<h5>', '</h5>', 5, 0);
+      html = MDParser.replace(/^####(.*$)/gim, html, '<h4>', '</h4>', 4, 0);
+      html = MDParser.replace(/^###(.*$)/gim, html, '<h3>', '</h3>', 3, 0);
+      html = MDParser.replace(/^##(.*$)/gim, html, '<h2>', '</h2>', 2, 0);
+      html = MDParser.replace(/^#(.*$)/gim, html, '<h1>', '</h1>', 1, 0);
+      html = MDParser.replace(/\!\!((?:(?!\!\!).))*\!\!/gim, html, '<span class="--marked">', '</span>', 2, 2);
+      html = MDParser.replace(/\[\[(((?:(?!\[\[|\]\]).))*)\]\]/gim, html, match => { let data = match[1].split('|'); return [ `<a href="${data[1] || '#'}" target="_blank_">`, data[0]]; }, '</a>', 2, 2);
+      html = MDParser.replace(/__((?:(?!__).))*__/gim, html, '<u>', '</u>', 2, 2);
+      html = MDParser.replace(/\*\*((?:(?!\*\*).))*\*\*/gim, html, '<b>', '</b>', 2, 2);
+      html = MDParser.replace(/\*((?:(?!\*).))*\*/gim, html, '<i>', '</i>', 1, 1);
+      html = MDParser.replace(/^>>(.*$)/gim, html, '<p class="--indented">', '</p>', 2, 0);
+      html = MDParser.replace(/^\[\[(.*$)/gim, html, '<p class="--boxed">', '</p>', 2, 0);
+      // TODO preformated code with {{{ ... }}} or ``` ... ```
+      // TODO list (ordered|unordered)
+      html = html.replaceAll('\n','<br>');
+
+      return html.trim();
+    }
+  }
+</script>

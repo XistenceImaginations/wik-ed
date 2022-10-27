@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style id="style-core">
+:root{
+  --sizeSidebar: min(80vw, 300px);
+  --sizeSidebarHeader: 32px;
+}
+*{
+  box-sizing: border-box;
+}
+[contenteditable]{
+  outline: 0px solid transparent;
+}
+html {
+  margin: 0;
+  padding: 0;
+}
+body{
+  font-family: 'Open Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
+  background-color: hsl(0 0% 15%);
+  color: hsl(0 0% 85%);
+  border: 2px solid transparent;
+  background-color: hsl(0 0% 15%);
+  min-width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0 1em;
+  padding-top: 170px;
+}
+body.--unsaved{
+  /*border: 2px dashed red;*/
+}
+label[for=sidebar-toggle] {
+  position: fixed;
+  right: 0;
+  top: 0;
+  transition: all .5s;
+  z-index: 2;
+  background: none;
+  font-size: var(--sizeSidebarHeader);
+}
+#data{
+  display: none;
+}
+#ui{
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  transition: all .5s;
+  width: 100%;
+  padding: 1em;
+  background-color: hsl(0deg 0% 100% / .1);
+  backdrop-filter: blur(.5em);
+}
+#render{
+  --padding: 2em;
+  transition: all .5s;
+  width: calc(100% - var(--padding));
+  transform: translateX(var(--padding));
+}
+#sidebar {
+  position: fixed;
+  width: var(--sizeSidebar);
+  height: 100vh;
+  overflow: hidden auto;
+  top: 0;
+  right: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  transition: all .5s;
+  transform: translateX(var(--sizeSidebar));
+  z-index: 1;
+  background: hsl(0deg 0% 0% / .25);
+  backdrop-filter: blur(.5em);
+  box-shadow: 0 0 0 hsl(0deg 0% 0% / .25);
+}
+#sidebar>#index {
+  position: absolute;
+  inset: var(--sizeSidebarHeader) 0 0 0;
+  width: 100%;
+  pointer-events: all;
+  padding: 0 0.5em;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  flex: 1;
+}
+#sidebar-toggle:checked ~ #sidebar {
+  transform: translateX(0);
+  box-shadow: 0 0 1.5em hsl(0deg 0% 0% / .125);
+}
+
+@media (min-width: 576px) {
+  /*label[for=sidebar-toggle]{
+    opacity: 0;
+    pointer-events: none;
+  }*/
+  /*#sidebar{
+    transform: translateX(0);
+  }*/
+  /*#ui{
+    width: calc(100% - var(--sizeSidebar));
+  }
+  #render{
+    width: calc(100% - var(--sizeSidebar));
+  }*/
+}
+
+
+@font-face {
+  font-family: 'icons';
+  src: url(data:application/font-woff;charset=utf-8;base64,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) format('woff');
+  font-weight: normal;
+  font-style: normal;
+}</style>
+    <template id="style-icons" lang="ccss">
+  // https://www.s-ings.com/projects/microns-icon-font/
+  .icon
+    font-family: 'icons'
+    font-style: normal
+    font-size: 1.5em
+    width: 1em
+    height: 1em
+    display: inline-flex
+    justify-content: center
+    align-items: center
+    vertical-align: middle
+    &::before >> font-size: .75em
+    // Arrows
+    &.i-arrow-left::before >> content: '\e700'
+    &.i-arrow-right::before >> content: '\e701'
+    &.i-arrow-up::before >> content: '\e702'
+    &.i-arrow-down::before >> content: '\e703'
+    &.i-left::before >> content: '\e704'
+    &.i-right::before >> content: '\e705'
+    &.i-up::before >> content: '\e706'
+    &.i-down::before >> content: '\e707'
+    &.i-upload::before >> content: '\e708'
+    &.i-download::before >> content: '\e709'
+    &.i-undo::before >> content: '\e70a'
+    &.i-redo::before >> content: '\e70b'
+    &.i-replay::before >> content: '\e70c'
+    &.i-refresh::before >> content: '\e796'
+    &.i-external::before >> content: '\e773'
+    &.i-internal::before >> content: '\e795'
+    &.i-carets::before >> content: '\e70f'
+    &.i-caret-up::before >> content: '\e710'
+    &.i-caret-down::before >> content: '\e711'
+    &.i-scale::before >> content: '\e793'
+    &.i-scale-h::before >> content: '\e79b'
+    &.i-scale-v::before >> content: '\e79c'
+    &.i-move::before >> content: '\e794'
+    &.i-drag::before >> content: '\e79d'
+    &.i-swap::before >> content: '\e79e'
+    &.i-shuffle::before >> content: '\e79f'
+    // Inline
+    &.i-inline-left::before >> content: '\e712'
+    &.i-inline-right::before >> content: '\e713'
+    &.i-inline-up::before >> content: '\e714'
+    &.i-inline-down::before >> content: '\e715'
+    &.i-tick::before >> content: '\e718'
+    &.i-cross::before >> content: '\e719'
+    &.i-plus::before >> content: '\e716'
+    &.i-minus::before >> content: '\e717'
+    &.i-equals::before >> content: '\e7a6'
+    &.i-divide::before >> content: '\e7a7'
+    &.i-bullet::before >> content: '\e71a'
+    &.i-asterisk::before >> content: '\e71b'
+    // Audio / Video
+    &.i-play::before >> content: '\e71c'
+    &.i-pause::before >> content: '\e71d'
+    &.i-previous::before >> content: '\e774'
+    &.i-next::before >> content: '\e775'
+    &.i-subtitles::before >> content: '\e71e'
+    &.i-volume-low::before >> content: '\e71f'
+    &.i-volume-mid::before >> content: '\e720'
+    &.i-volume-high::before >> content: '\e721'
+    &.i-volume-mute::before >> content: '\e722'
+    &.i-captions::before >> content: '\e723'
+    &.i-high-def::before >> content: '\e724'
+    &.i-audio-desc::before >> content: '\e725'
+    // Charts
+    &.i-chart-line::before >> content: '\e726'
+    &.i-chart-bar::before >> content: '\e727'
+    &.i-chart-scatter::before >> content: '\e728'
+    &.i-chart-area::before >> content: '\e7a3'
+    &.i-chart-pie::before >> content: '\e729'
+    // Time / Date
+    &.i-calendar::before >> content: '\e72a'
+    &.i-clock::before >> content: '\e72b'
+    // User actions
+    &.i-star::before >> content: '\e72c'
+    &.i-heart::before >> content: '\e72d'
+    &.i-flag::before >> content: '\e72e'
+    &.i-bookmark::before >> content: '\e72f'
+    &.i-chat::before >> content: '\e730'
+    // Editorial
+    &.i-edit::before >> content: '\e731'
+    &.i-delete::before >> content: '\e732'
+    &.i-add::before >> content: '\e70d'
+    &.i-remove::before >> content: '\e70e'
+    &.i-show::before >> content: '\e733'
+    &.i-hide::before >> content: '\e734'
+    &.i-lock::before >> content: '\e735'
+    &.i-disable::before >> content: '\e7a4'
+    &.i-pick::before >> content: '\e7a5'
+    &.i-cog::before >> content: '\e736'
+    &.i-link::before >> content: '\e737'
+    &.i-attach::before >> content: '\e776'
+    &.i-copy::before >> content: '\e78a'
+    // Users
+    &.i-user::before >> content: '\e738'
+    &.i-group::before >> content: '\e739'
+    // Content
+    &.i-file::before >> content: '\e73a'
+    &.i-folder::before >> content: '\e777'
+    &.i-image::before >> content: '\e73b'
+    &.i-video::before >> content: '\e73c'
+    &.i-audio::before >> content: '\e73d'
+    &.i-microphon::before >> content: '\e778'
+    &.i-camera::before >> content: '\e779'
+    &.i-printer::before >> content: '\e73a'
+    // Navigation
+    &.i-menu::before >> content: '\e73f'
+    &.i-bars::before >> content: '\e740'
+    &.i-options-h::before >> content: '\e742'
+    &.i-options-v::before >> content: '\e743'
+    &.i-home::before >> content: '\e77a'
+    &.i-close::before >> content: '\e741'
+    &.i-zoom::before >> content: '\e744'
+    &.i-zoom-in::before >> content: '\e745'
+    &.i-zoom-out::before >> content: '\e746'
+    &.i-collapse::before >> content: '\e747'
+    &.i-expand::before >> content: '\e748'
+    // Layout
+    &.i-grid::before >> content: '\e749'
+    &.i-list::before >> content: '\e77b'
+    &.i-landscape::before >> content: '\e78d'
+    &.i-portrait::before >> content: '\e78e'
+    &.i-panel-left::before >> content: '\e78f'
+    &.i-panel-right::before >> content: '\e790'
+    &.i-minimize::before >> content: '\e791'
+    &.i-maximize::before >> content: '\e792'
+    // Network
+    &.i-mail::before >> content: '\e74e'
+    &.i-code::before >> content: '\e74f'
+    &.i-cloud::before >> content: '\e769'
+    &.i-web::before >> content: '\e76a'
+    &.i-wifi::before >> content: '\e76b'
+    &.i-drive::before >> content: '\e787'
+    &.i-server::before >> content: '\e788'
+    &.i-rss::before >> content: '\e74c'
+    &.i-share::before >> content: '\e74d'
+    // Toggle
+    &.i-box::before >> content: '\e750'
+    &.i-box-filled::before >> content: '\e751'
+    &.i-box-plus::before >> content: '\e752'
+    &.i-box-minus::before >> content: '\e753'
+    &.i-box-tick::before >> content: '\e754'
+    &.i-box-cross::before >> content: '\e755'
+    &.i-box-plus-o::before >> content: '\e77d'
+    &.i-box-minus-o::before >> content: '\e77c'
+    &.i-box-tick-o::before >> content: '\e77e'
+    &.i-box-cross-o::before >> content: '\e77f'
+    &.i-radio-off::before >> content: '\e756'
+    &.i-radio-on::before >> content: '\e757'
+    &.i-radio-filled::before >> content: '\e758'
+    &.i-power::before >> content: '\e789'
+    // Status
+    &.i-info::before >> content: '\e759'
+    &.i-warn::before >> content: '\e75a'
+    &.i-success::before >> content: '\e75b'
+    &.i-error::before >> content: '\e75c'
+    &.i-question::before >> content: '\e780'
+    // Text
+    &.i-text::before >> content: '\e75d'
+    &.i-bold::before >> content: '\e75e'
+    &.i-italic::before >> content: '\e75f'
+    &.i-underline::before >> content: '\e760'
+    &.i-strike::before >> content: '\e761'
+    &.i-font-size::before >> content: '\e762'
+    &.i-clear-styles::before >> content: '\e763'
+    &.i-subscript::before >> content: '\e7a0'
+    &.i-superscript::before >> content: '\e7a1'
+    &.i-paragraph::before >> content: '¶'
+    &.i-hashtag::before >> content: '#'
+    &.i-at::before >> content: '@'
+    &.i-language::before >> content: '\e786'
+    // Alignment
+    &.i-align-left::before >> content: '\e764'
+    &.i-align-center::before >> content: '\e765'
+    &.i-align-right::before >> content: '\e766'
+    &.i-justify-left::before >> content: '\e782'
+    &.i-justify-center::before >> content: '\e781'
+    &.i-justify-right::before >> content: '\e783'
+    &.i-indent::before >> content: '\e767'
+    &.i-outdent::before >> content: '\e768'
+    &.i-chapters::before >> content: '\e74b'
+    &.i-columns::before >> content: '\e7a2'
+    &.i-sort-asc::before >> content: '\e784'
+    &.i-sort-desc::before >> content: '\e785'
+    // Layers
+    &.i-above::before >> content: '\e78b'
+    &.i-below::before >> content: '\e78c'
+    &.i-difference::before >> content: '\e797'
+    &.i-intersect::before >> content: '\e798'
+    &.i-outline::before >> content: '\e799'
+    &.i-unite::before >> content: '\e79a'
+</template>
+    <template id="style-bg" lang="ccss">
+  #bg
+    position: fixed
+    width: 100vw
+    height: 100vh
+    top: 0
+    left: 0
+    pointer-events: none
+    z-index: -1
+    overflow: hidden
+    background: url('https://images.unsplash.com/photo-1454117096348-e4abbeba002c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80')
+    background-size: cover
+    background-position: center
+    opacity: .5
+    filter: contrast(2) brightness(.1) grayscale(1)
+</template>
+    <template id="style-ui" lang="ccss">
+  * >> box-sizing: border-box
+  :host
+    display: flex
+    flex-wrap: wrap
+    gap: 5px
+    background-image: linear-gradient(-45deg, transparent 75%, hsl(210deg 100% 50% / .1) 75%)
+    padding: 2em
+  input[type=text]
+    outline: 0px solid transparent
+    color: white
+    &::placeholder >> color: hsl(0deg 0% 100% / .5)
+  .title
+    transition: all .5s
+    flex-basis: 100%
+  .title:first-of-type
+    padding: 0 .75rem
+    margin: 0 -.75rem
+  .title:last-of-type
+    padding: 0 .75rem 0 2rem
+    margin: 0 -.75rem 1em -.75rem
+  h1
+    margin: 0
+    border-radius: .25rem
+    width: min-content
+    white-space: nowrap
+    &:hover >> background-color: hsl(0deg 0% 100% / .125)
+  h4
+    margin: 0
+    font-weight: normal
+    border-radius: .25rem
+    width: min-content
+    white-space: nowrap
+    &:hover >> background-color: hsl(0deg 0% 100% / .125)
+  .icon
+    background-color: hsl(0deg 0% 100% / .125)
+    border-radius: .25rem
+    transition: all .5s
+    box-shadow: 0 0 .75em -.25em hsl(0deg 0% 0% / .5)
+    &:hover >> background-color: hsl(0deg 0% 100% / .25)
+  .autosave,
+  .search
+    font-size: 1em
+    border-radius: .25rem
+    background-color: hsl(0deg 0% 100% / .125)
+    border: none
+    min-height: 1.5em
+    vertical-align: middle
+    box-shadow: 0 0 .75em -.25em hsl(0deg 0% 0% / .5)
+    transition: all .5s
+    &:hover >> background-color: hsl(0deg 0% 100% / .25)
+</template>
+    <template id="style-index" lang="ccss">
+  :host
+    display: flex
+    flex-direction: column
+  .tag
+    background-color: hsl(0 0% 100% / .25)
+    border-radius: .25rem
+    padding: 0 1em
+    margin-right: .25em
+    margin-bottom: .5em
+    animation-duration: .5s
+    animation-fill-mode: forwards
+    animation-name: fadeIn
+    display: inline-flex
+    &.--visible >> background-color: hsl(210 100% 75% / .35)
+    #title >> flex: 1
+    #close >> flex: 0
+    #remove >> flex: 0
+</template>
+
+    <template id="style-entry" lang="ccss">
+  * >> box-sizing: border-box
+  [contenteditable] >> outline: 0px solid transparent
+  :host
+    display: flex
+    flex-direction: column
+    --entryHeight: 250px
+  .--marked >> background: hsl(60deg 100% 50% / .25)
+  .--indented
+    margin: 0
+    padding-left: 1em
+  .--boxed
+    margin: 0
+    padding: 1em
+    border: 1px solid hsl(60deg 0% 100% / .25)
+  a >> color: white
+  h1 >> margin: 0.5em 0
+  h2 >> margin: 0.5em 0
+  h3 >> margin: 0.25em 0
+  h4 >> margin: 0.25em 0
+  h5 >> margin: 0.125em 0
+  h6 >> margin: 0.125em 0
+  article
+    padding: 1em
+    display: flex
+    flex-direction: column
+    width: 100%
+    margin-bottom: 2em
+    background-color: hsl(0 0% 100% / .03)
+    border-radius: .25em
+    backdrop-filter: blur(1em)
+    animation-duration: .5s
+    animation-fill-mode: forwards
+    flex-basis: 0
+    //box-shadow: inset 0 0 10px hsl(0 0% 100% / .25), inset 0 0 0 1px hsl(0 0% 100% / .25)
+    box-shadow: inset 0 0 10px hsl(0 0% 100% / .01), inset 0 0 0 1px hsl(0 0% 100% / .05)
+    margin-bottom: 0
+    padding: 0 1em
+    flex-basis: 0
+    opacity: 0
+    min-height: min-content
+    transition: all .5s
+  article>div
+    flex: 1
+    margin-left: 1em
+  article>div:empty::before
+    pointer-events: none
+    content: 'Enter some text'
+    color: currentColor
+    opacity: .5
+  article>h3
+    margin: 0 0 .5em 0
+    border-bottom: 1px solid hsl(0deg 0% 100% / .1)
+    display: inline-flex
+  article>h3>#close
+    width: 32px
+    height: 32px
+    display: flex
+    justify-content: center
+    align-items: center
+  article>h3>.icon >> cursor: pointer
+  article>h3>#title >> flex: 1
+  article>h3>#meta >> flex: 0
+  article>h3>#title:empty::before
+    pointer-events: none
+    content: 'Enter a title'
+    color: currentColor
+    opacity: .5  
+  @keyframes fadeIn
+    0%
+      margin-bottom: 0
+      padding: 0 1em
+      flex-basis: 0
+      opacity: 0
+    100%
+      margin-bottom: 2em
+      padding: 1em
+      flex-basis: var(--entryHeight)
+      opacity: 1
+  @keyframes fadeOut
+    0%
+      margin-bottom: 2em
+      padding: 1em
+      flex-basis: var(--entryHeight)
+      opacity: 1
+    100%
+      margin-bottom: 0
+      padding: 0 1em
+      flex-basis: 0
+      opacity: 0
+</template>
+    <script id="script-core">
+  // TODO save and restore open entries by not setting just 'visible', instead use their current array-index (-1 for not visible, anything else visible and in this order)
+
+  class Reactive {
+    static property(object, key, value, listener) {
+      if (object && key) {
+        Object.defineProperty(object, key, {
+          get() { return value; },
+          set(newValue) {
+            value = newValue;
+            if (listener) { listener(value, newValue); }
+            if ($) { $.propertyChanged(key, value, newValue); }
+          }
+        });
+        object[key] = value;
+      }
+    }
+  }
+
+  class Core {
+    constructor() {
+      this.modules = {};
+      this.searchTerm = undefined;
+      this.searchPause = 0;
+      this.searchDelayer = setInterval(() => {
+        if (this.searchPause > 0) {
+          this.searchPause--;
+          if (this.searchPause == 0) {
+            this.filterAndUpdateEntries();
+          }
+        }
+      }, 100);
+      this.unsaved = false;
+
+      document.addEventListener('DOMContentLoaded', this.init.bind(this));
+    }
+
+    propertyChanged(propertyName, oldValue, newValue) {
+      switch(propertyName) {
+        case 'projectName': document.title = (newValue || '???').trim(); break;
+      }
+      if (this.ready) {
+        this.storeData();
+      }
+    }
+
+    require(id) {
+      return $?.modules?.[id];
+    }
+
+    init() {
+      // We load styles from templates in a compact way (CCSS - compact cascading style sheets)
+      //  which will be - after loading and parsing - being hold up in JS as style objects (so
+      //  they won't appear in DOM).
+      this.styles = {};
+
+      // Load CCSS-Parser and execute it.
+      $.require('ccss').parse();
+
+      // Get all essential areas and containers. This should be done before
+      //  adding any further elements or creating/rendering content.
+      this.dataCont = document.querySelector('script#database');
+      this.body = this.handle(document.body).attachStyles('style-icons').get();
+      this.uiDOM = this.handle(document.querySelector('#ui')).shadowed().attachStyles('style-ui', 'style-icons').get();
+      this.renderDOM = this.handle(document.querySelector('#render')).shadowed().attachStyles('style-entry', 'style-icons').get();
+      this.indexDOM = this.handle(document.querySelector('#index')).shadowed().attachStyles('style-index', 'style-icons').get();
+
+      // Converts the global '$properties'-object to a reactive object, property changes will
+      //  trigger registered listeners and will also trigger storing the properties back into
+      //  the data store.
+      Object.keys($properties).forEach(property => Reactive.property($properties, property, $properties[property]));
+
+      // Initial rendering of all entries.
+      $entries
+        .forEach(entry => {
+          this.renderEntry(entry);
+          this.renderEntryKnob(entry);
+        });
+
+      // Create dynamic elements which are not ment to be saved with the page later on.
+      // TODO maybe use <template> and/or shadow tree to write them directly in to the html?
+      this.handle(document.querySelector('#bg')).attachStyles('style-bg').get();
+      this.handle('H1').editable('', '', (id, key, content) => $properties.projectName = content).text($properties.projectName).tooltip('Main title for your project').wrap('DIV').class('title').spawn(this.uiDOM);
+      this.handle('H4').editable('', '', (id, key, content) => $properties.topic = content).text($properties.topic).tooltip('Subtitle or topic for your project').wrap('DIV').class('title').spawn(this.uiDOM);
+      this.handle('SPAN').class('icon', 'i-add').on('click', event => this.addEntry({ id: Date.now(), visible: true })).tooltip('Add a new entry').spawn(this.uiDOM);
+      this.handle('SPAN').class('icon', 'i-download').on('click', event => this.save()).tooltip('Save (download) this project').spawn(this.uiDOM);
+      this.handle('INPUT').attr('type', 'text').class('search').attr('placeholder', 'Enter search term...').tooltip('Search for entries by their title').on('keyup', event => this.search(event.target.value)).spawn(this.uiDOM);
+      this.handle('INPUT').attr('type', 'text').class('autosave').attr('placeholder', 'Autosave filename').tooltip('Autosave filename').text($properties.autosave).on('keyup', event => $properties.autosave = event.target.value).spawn(this.uiDOM);
+
+      // Update views and filters.
+      this.filterAndUpdateEntries();
+      this.filterAndUpdateEntryKnobs();
+
+      setInterval(() => {
+        if (($properties.autosave || '').trim().length > 0) {
+          this.save($properties.autosave);
+        }
+      }, 1000 * 60 * 1);
+
+      // All done, ready to go.
+      this.ready = true;
+    }
+
+    search(term) {
+      this.searchPause = 5;
+      this.searchTerm = term;
+    }
+
+    save(name) {
+      this.unsaved = false;
+      this.updateView();
+      this.download(name ? `${name}.html` : `index-${Date.now()}.html`/* TODO instead of 'index' use title (check for URL/File-conform characters in title) */, '<!doctype html><html>\n' + document.head.outerHTML + document.body.outerHTML + '</html>');
+    }
+
+    download(filename, text) {
+      this.handle('A')
+          .attr('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text))
+          .attr('download', filename)
+          .css('display', 'none')
+          .spawn().click().destroy();
+    }
+
+    renderEntryKnob(data) {
+      this.handle('DIV')
+          .attr('id', 'entry-knob-' + data.id)
+          .attr('class', 'tag')
+          .html(`<span id="title">${data.title || 'n/a'}</span><span id="remove" class="icon i-delete"><span id="close" class="icon i-close"></span>`)
+          .query('#remove', h => h.on('click', event => this.removeEntry(data.id)).tooltip('Delete this entry'))
+          .query('#close', h => h.on('click', event => this.toggleEntryVisibility(data.id, false)).tooltip('Close this entry'))
+          .query('#title', h => h.on('click', event => this.toggleEntryVisibility(data.id, true)))
+          .spawn(this.indexDOM);
+    }
+
+    renderEntry(data) {
+      let isEditing = false;
+      let handle = this.handle('ARTICLE');
+
+      handle
+          .attr('id', 'entry-' + data.id)
+          .css('animationName', 'fadeOut')
+          .css('display', 'none')
+          .html(`<h3><span id="title">${data.title || ''}</span><span id="meta">(${data.id})</span><span class="icon i-edit" id="edit"></span><span class="icon i-delete" id="remove"></span><span class="icon i-close" id="close"></span></h3><div>${$.require('markdown').parse(this.encodeText(data.content))}</div>`)
+          .query('h3>#close', h => h.on('click', event => this.toggleEntryVisibility(data.id, false)).tooltip('Close this entry'))
+          .query('h3>#remove', h => h.on('click', event => this.removeEntry(data.id)).tooltip('Delete this entry'))
+          .query('h3>#edit', h => h.on('click', event => { handle.fire('edit', isEditing, 'div'); isEditing = !isEditing; }).tooltip('Edit this entry'))
+          .query('div', h => h.on('edit', event => {
+            if (event.detail) {
+              this.updateEntry(data.id, 'content', this.decodeText(h.get().innerText));
+              h.html($.require('markdown').parse(h.get().innerText || ''));
+            } else {
+              h.text(this.encodeText(data.content));
+            }
+            h.attr('contentEditable', !event.detail);
+          }))
+          .query('h3>#title', h => h.editable(data.id, 'title', (id, key, content) => this.updateEntry(id, key, content)))
+          .spawn(this.renderDOM);
+    }
+
+    decodeText(text) {
+      return (text || '').replaceAll('\n','\\N');
+    }
+
+    encodeText(text) {
+      return (text || '').replaceAll('\\N','\n');
+    }
+
+    // TODO dom-util?
+    handle(elm) {
+      elm = typeof elm === 'string' ? document.createElement(elm) : elm;
+      const handler = {
+        // Converts 'elm' into a shadowed version. All actions following will apply on the shadow-dom.
+        shadowed    : () => { elm = elm.attachShadow({ mode: "open" }); return handler; },
+        // Copies one or more style-definitions into 'elm'. Each id will refer to a 'style'-block using that id.
+        attachStyles: (...styleIds) => {
+          styleIds.forEach(styleId => {
+            if (this.styles[styleId]) {
+              elm.appendChild(this.styles[styleId].cloneNode(true));
+            } else {
+              elm.appendChild(document.querySelector(`style[id=${styleId}]`).cloneNode(true))
+            }
+          });
+          return handler;
+        },
+        wrap        : (tag) => { let wrapper = document.createElement(tag); elm.parentNode ? elm.parentNode.appendChild(wrapper) : null; wrapper.appendChild(elm); elm = wrapper; return handler; },
+        // Sets an attribute on 'elm'.
+        attr        : (key, value) => { elm.setAttribute(key, value); return handler; },
+        // Applies 'str' as inner text to 'elm'.
+        text        : str => { elm.innerText = str; return handler; },
+        // Applies 'str' as inner HTML to 'elm'.
+        html        : str => { elm.innerHTML = str; return handler; },
+        // Fires a custom event.
+        fire        : (type, data, target) => { (target ? typeof target === 'string' ? elm.querySelector(target) : target : elm).dispatchEvent(new CustomEvent(type, { detail: data })); return handler; },
+        // Registering a listener for event 'type'.
+        on          : (type, listener) => { elm.addEventListener(type, event => listener(event, handler)); return handler; },
+        // Sets a single CSS-property. Note that you still need to use correct camel cased key (even as 'string').
+        css         : (prop, value) => { elm.style[prop] = value; return handler; },
+        class       : (...classes) => { classes.forEach(cls => elm.classList.add(cls)); return handler; },
+        // 'Spawns' this element as child in a 'target' (if target is not defined it will be document.body).
+        spawn       : (target) => { (target || document.body).appendChild(elm); return handler; },
+        // Removes this element from its parent (and DOM).
+        destroy     : () => { elm ? elm.remove() : null; return handler; },
+        // Simulates a 'click' on the element.
+        click       : () => { elm.click(); return handler; },
+        // Queries a single element with a selector and invokes a callback with the element wrapped in another handler.
+        query       : (selector, callback) => { callback(this.handle(elm.querySelector(selector))); return handler; },
+        // Makes the element editable.
+        editable    : (id, key, listener, viewHandler) => { this.makeEditable(elm, id, key, listener, viewHandler); return handler; },
+        append      : provider => { let child = provider(elm, handler); child = child instanceof HTMLElement ? child : child.get(); elm.appendChild(child); return handler; },
+        // Returns the element from this handler.
+        tooltip     : tooltip => { elm.setAttribute('title', tooltip || '???'); return handler; },
+        get         : () => elm
+      };
+      return handler;
+    }
+
+    // TODO dom-util?
+    makeEditable(elm, id, key, listener, viewHandler) {
+      elm.contentEditable = true;
+
+      if (viewHandler) {
+        elm.onfocus = event => viewHandler.startEdit ? elm.innerText = viewHandler.startEdit() : null;
+        elm.onblur = event => viewHandler.endEdit ? viewHandler.endEdit(elm.innerText, elm) : null;
+      } else {
+        elm.onfocus = event => elm.originContent = elm.innerHTML;
+        elm.onblur = event => {
+          if (elm.originContent != elm.innerHTML) {
+            if (listener) {
+              listener(id, key, elm.innerHTML);
+            }
+          }
+          delete elm.originContent;
+        };
+      }
+    }
+
+    updateView() {
+      document.body.classList[this.unsaved ? 'add': 'remove']('--unsaved');
+    }
+
+    delay(delay, callback) {
+      let timer = setTimeout(() => {
+        callback();
+        clearTimeout(timer);
+      }, delay);
+    }
+
+    filterAndUpdateEntries() {
+      $entries
+        .forEach(entry => {
+          const
+            idx = $editing.indexOf(entry.id),
+            elm = this.renderDOM.querySelector('#entry-' + entry.id),
+            state = (this.searchTerm ? (entry.title || '').toLowerCase().includes(this.searchTerm.toLowerCase()) : $editing.includes(entry.id)) ? 'fadeIn' : 'fadeOut';
+
+          if (state != elm.style.animationName) {
+            if ('fadeIn' === state) {
+              this.renderDOM.prepend(elm);
+
+              elm.style.order = idx === -1 ? '9999999' : idx;
+
+              this.delay(500, () => elm.style.overflow = 'unset');
+            } else {
+              elm.style.overflow = 'hidden';
+
+              this.delay(500, () => elm.style.order = idx === -1 ? '9999999' : idx);
+            }
+
+            elm.style.display = 'flex';
+            elm.style.animationName = state;
+          }
+        });
+    }
+
+    filterAndUpdateEntryKnobs() {
+      $entries
+        .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+        .forEach(entry => {
+          const elm = this.indexDOM.querySelector('#entry-knob-' + entry.id);
+          this.handle(elm)
+            .query('#title', h => h.text(entry.title || '(n/a)'))
+          // TODO to handler
+          elm.classList[$editing.includes(entry.id) ? 'add' : 'remove']('--visible');
+
+          // TODO BUG closing entries deletes them from index
+          // -------------------------------------------------- this.indexDOM.append(elm);
+        });
+    }
+
+    toggleEntryVisibility(id, isVisible) {
+      let idx = $editing.indexOf(id);
+      if (idx !== -1) {
+        $editing.splice(idx, 1);
+      }
+      if (isVisible) {
+        $editing.unshift(id);
+      }
+
+      this.storeData();
+      this.filterAndUpdateEntries();
+      this.filterAndUpdateEntryKnobs();
+    }
+
+    addEntry(data) {
+      $entries.push(data);
+
+      this.unsaved = true;
+      this.updateView();
+      this.renderEntry(data);
+      this.renderEntryKnob(data);
+      this.toggleEntryVisibility(data.id, true);
+    }
+
+    removeEntry(id) {
+      $entries
+        .filter(entry => entry.id === id)
+        .forEach(entry => {
+          const idx = $entries.indexOf(entry);
+
+          if (idx !== -1) {
+            const elmEntry = this.renderDOM.querySelector('#entry-' + entry.id);
+            const elmEntryKnob = this.indexDOM.querySelector('#entry-knob-' + entry.id);
+
+            elmEntry.style.animationName = 'fadeOut';
+
+            this.delay(500, () => {
+              elmEntry.remove();
+              elmEntryKnob.remove();
+
+              $entries.splice(idx, 1);
+
+              this.updateView();
+              // TODO remove from $editing
+              // TODO use this > toggleEntryVisibility   and remove the three lines below
+              this.storeData()
+              this.filterAndUpdateEntries();
+              this.filterAndUpdateEntryKnobs();
+            });
+          }
+        });
+    }
+
+    updateEntry(id, key, value) {
+      $entries
+          .filter(entry => entry.id === id)
+          .forEach(entry => entry[key] = value);
+      this.storeData();
+      this.filterAndUpdateEntryKnobs();
+    }
+
+    /**
+     * Store all data into the data container (properties and entries).
+     */
+    storeData() {
+      this.dataCont.innerText = `const $properties = ${JSON.stringify($properties, undefined, 0).replace(/\\n/g, '')};const $editing = ${JSON.stringify($editing, undefined, 0)};const $entries = ${JSON.stringify($entries, undefined, 0).replace(/\\n/g, '')};`;
+    }
+  }
+
+const $ = new Core();
+</script>
+
+    <script id="script-md-parser">
+  // Register module.
+  ($?.modules||{})['markdown'] = class MDParser {
+    static replace(regex, text, start, end, startCrop, endCrop) {
+      let output = text;
+      // Get all matches for 'regex'.
+      [...text.matchAll(regex)]
+        // Due to string manipulation we iterate the matches from last to
+        //  first, otherwise we have to remember an offset as manipulating
+        //  the string will change the indices of all following matches.
+        .reverse()
+        // Handle each match.
+        .forEach(match => {
+          // The 'start'-definition can be a simple string or a function
+          //  returning a string or array of strings. If it is an array
+          //  it is expected that the first entry is the startTag to render
+          //  and the second (optional) entry the content to render between
+          //  the tags.
+          let data = (typeof start === 'function' ? start(match) : start);
+          let startTag = Array.isArray(data) ? data[0] || '???' : data;
+          let content = Array.isArray(data) ? data[1] || '???' : output.substring(match.index + startCrop, match.index + match[0].length - endCrop);
+          let endTag = end;
+
+          output = output.substring(0, match.index) +
+                   startTag + content + endTag +
+                   output.substring(match.index + match[0].length)
+        });
+      return output;
+    }
+
+    static parse(text) {
+      let html = text;
+      html = MDParser.replace(/^######(.*$)/gim, html, '<h6>', '</h6>', 6, 0);
+      html = MDParser.replace(/^#####(.*$)/gim, html, '<h5>', '</h5>', 5, 0);
+      html = MDParser.replace(/^####(.*$)/gim, html, '<h4>', '</h4>', 4, 0);
+      html = MDParser.replace(/^###(.*$)/gim, html, '<h3>', '</h3>', 3, 0);
+      html = MDParser.replace(/^##(.*$)/gim, html, '<h2>', '</h2>', 2, 0);
+      html = MDParser.replace(/^#(.*$)/gim, html, '<h1>', '</h1>', 1, 0);
+      html = MDParser.replace(/\!\!((?:(?!\!\!).))*\!\!/gim, html, '<span class="--marked">', '</span>', 2, 2);
+      html = MDParser.replace(/\[\[(((?:(?!\[\[|\]\]).))*)\]\]/gim, html, match => { let data = match[1].split('|'); return [ `<a href="${data[1] || '#'}" target="_blank_">`, data[0]]; }, '</a>', 2, 2);
+      html = MDParser.replace(/__((?:(?!__).))*__/gim, html, '<u>', '</u>', 2, 2);
+      html = MDParser.replace(/\*\*((?:(?!\*\*).))*\*\*/gim, html, '<b>', '</b>', 2, 2);
+      html = MDParser.replace(/\*((?:(?!\*).))*\*/gim, html, '<i>', '</i>', 1, 1);
+      html = MDParser.replace(/^>>(.*$)/gim, html, '<p class="--indented">', '</p>', 2, 0);
+      html = MDParser.replace(/^\[\[(.*$)/gim, html, '<p class="--boxed">', '</p>', 2, 0);
+      // TODO preformated code with {{{ ... }}} or ``` ... ```
+      // TODO list (ordered|unordered)
+      html = html.replaceAll('\n','<br>');
+
+      return html.trim();
+    }
+  }
+</script>
+
+    <script id="script-ccss-parser">
+  class CssNode {
+    constructor(line) {
+      this.line = line.trim();
+      this.parent = undefined;
+      this.children = [];
+      this.selectors = [];
+      this.key = undefined;
+      this.value = undefined;
+      this.isConcatenated = this.line.charCodeAt(this.line.length -1) == 44;
+      this.isProperty = false;
+
+      let chr = this.line.charCodeAt(0);
+
+      if (this.isConcatenated) {
+        this.line = this.line.substring(0, this.line.length - 1);
+      }
+      let colonIdx = line.indexOf(':');
+
+      // We epxect that a property is defined by a colon followed by a space, otherwise it must
+      //  be some kind of pseudo class or property or selector of any kind.
+      if (colonIdx != -1 && line.charAt(colonIdx + 1) === ' ') {
+        this.key = line.substring(0, colonIdx).trim();
+        this.value = line.substring(colonIdx + 1).trim();
+        this.isProperty = true;
+      } else {
+        this.selectors.push(this.line);
+      }
+    }
+
+    merge(otherNode) {
+      this.selectors.push(...otherNode.selectors);
+    }
+  }
+
+  // Register module.
+  ($?.modules||{})['ccss'] = class CCSSParser {
+    static parse() {
+      return new CCSSParser();
+    }
+
+    constructor() {
+      Array
+        // Get all CCSS(Compact CSS) - Blocks
+        .from(document.head.querySelectorAll('[lang=ccss]'))
+        .forEach(block => this.render(block, this.build(this.parse(this.validate(block.content.textContent)), [''], '')));
+    }
+
+    validate(text) {
+      let lines = [];
+
+      text.split('\n')
+        // Remove single line comments.
+        .filter(line => !line.trim().startsWith('//'))
+        // Remove empty lines.
+        .filter(line => line.trim().length > 0)
+        // Parses 'single line'-rules (one selector with just one property, can be written as '<Selector> >> <Property>').
+        .forEach((line, i) => {
+          if (line.includes('>>')) {
+            let indent = this.indentOf(line);
+            let singleLine = line.split('>>');
+            lines.push(' '.repeat(indent) + singleLine[0].trim());
+            lines.push(' '.repeat(indent + 2) + singleLine[1].trim());
+          } else {
+            lines.push(line);
+          }
+        });
+
+      // Check if there are spaces used as indent (and only spaces).
+      let containsSpacesOnly = lines.filter(line => !/^ *\S/.test(line)).length === 0;
+      // Check if there are tabs used as indent (and only tabs).
+      let containsTabsOnly = lines.filter(line => !/^\t*\S/.test(line)).length === 0;
+      // Check either tabs or spaces are used as indent.
+      let containsBoth = lines.some(line => !containsSpacesOnly && !containsTabsOnly && /^\W*\S/.test(line));
+      let isValid = !containsBoth && (containsSpacesOnly || containsTabsOnly);
+
+      if (!isValid) {
+        throw new Error('CCSS-definition contains a mix of spaces and tabs.');
+      }
+      return lines;
+    }
+
+    parse(lines) {
+      // The smallest indent is used as root-indent, all other line-indents
+      //  will be subtracted by this root-indent, so we're starting virtually
+      //  with indent 0.
+      const smallestIndent = Math.min(...lines.map(this.indentOf));
+      lines = lines.map(line => line.substring(smallestIndent));
+
+      let root = new CssNode('');
+      let parentNode = root;
+      let lastNode = root;
+      let currentNode = undefined;
+      let lastIndent = -1;
+      let currentIndent = undefined;
+      let createAndAdd = line => {
+        currentNode = new CssNode(line);
+        currentNode.parent = parentNode;
+        parentNode.children.push(currentNode);
+        lastNode = currentNode;
+      };
+
+      lines.forEach(line => {
+        currentIndent = this.indentOf(line) / 2/* spaces*/;
+
+        if (currentIndent > lastIndent) { // down
+          parentNode = lastNode;
+
+          createAndAdd(line);
+        } else if (currentIndent < lastIndent) { // up
+          while(currentIndent < lastIndent) {
+            parentNode = parentNode.parent;
+            lastIndent--;
+          }
+
+          createAndAdd(line);
+        } else { // same
+          if (lastNode.isConcatenated) {
+            lastNode.merge(new CssNode(line));
+          } else {
+            createAndAdd(line);
+          }
+        }
+        lastIndent = currentIndent;
+      });
+      return root;
+    }
+
+    build(node, upperSelectors=[], cssJson) {
+      let mergedSelectors = [];
+      let properties = {};
+      let hasProperties = false;
+      let wrapper = undefined;
+
+      node.selectors.forEach(selector => {
+        upperSelectors.forEach(upperSelector => {
+          // Check for queries. We mark that we have a query currently,
+          //  as these will set up a special wrappers around standard CSS-Rule
+          //  we have to render.
+          if (selector.charAt(0) === '@') {
+            wrapper = selector;
+          }
+
+          let mergedSelector;
+          if (selector.charAt('0') === '&') {
+            mergedSelector = (selector.replaceAll('&', upperSelector)).trim();
+          } else {
+            mergedSelector = (upperSelector + ' ' + selector.replaceAll('&', upperSelector)).trim();
+          }
+          // If a wrapper is set we won't use the query-selector itself in
+          //  our merged selectors, so we strip it out.
+          if (wrapper && mergedSelector.startsWith(mergedSelector)) {
+            mergedSelector = mergedSelector.substring(wrapper.length).trim();
+          }
+
+          mergedSelectors.push(mergedSelector);
+        });
+      });
+      node.children.forEach(child => {
+        if (child.isProperty) {
+          hasProperties = true;
+          properties[child.key.trim()] = child.value.trim();
+        }
+      });
+      if (wrapper) {
+        cssJson += wrapper + '{\n';
+      }
+      if (hasProperties) {
+        mergedSelectors.forEach(selector => {
+          cssJson += selector + ' {\n';
+          Object.keys(properties).forEach(key => cssJson += '  ' + key + ': ' + properties[key] + ';\n');
+          cssJson += '}\n';
+        });
+      }
+      node.children.forEach(child => {
+        if (!child.isProperty) {
+          cssJson = this.build(child, mergedSelectors, cssJson);
+        }
+      });
+      if (wrapper) {
+        cssJson += '}\n';
+      }
+      return cssJson;
+    }
+
+    render(block, cssJson) {
+      let style = document.createElement('STYLE');
+      let head = document.head || document.getElementsByTagName('head')[0];
+      style.id = block.id;
+      style.type = 'text/css';
+      style.innerHTML = cssJson;
+
+      $.styles[block.id] = style;
+    }
+
+    indentOf(line) {
+      return line.search(/\S|$/);
+    }
+  }
+</script>
+
+    <script id="database">
+      const $properties = {projectName: "Wik'ed-Project", topic: "Topic title", autosave: ""};
+      const $editing = [0, 1];
+      const $entries = [{"id":0,"title":"Welcome","content":
+        'This is a self-contained, wiki-like page which you can use as notepad, knowledgebase or similar.\\N' +
+        'Due to its nature you can save/backup your work by saving the page itself, as it contains all current data and all functionality.\\N' +
+        'To save the page use the \'save\' button and not the \'Save page\'-option of your browser (that will break your page).'
+      },{"id":1,"title":"Markup","content":
+        'The content here is written in a simple markdown-ish way:\\N\\N\\N' +
+        '#### This is a header, the more asterisks used (1 to 6) the smaller the header typ\\N' +
+        '*This is italic text*\\N' + 
+        '**This is bold text*\\N' +
+        '[[This is a link|https://www.google.de]]\\N' +
+        '!!This is marked text!!\\N' +
+        '>> Indented Block\\N' +
+        '[[ Boxed Content'
+      }];
+    </script>
+    <title></title>
+  </head>
+  <body>
+    <input type="checkbox" id="sidebar-toggle" hidden>
+    <label for="sidebar-toggle" class="icon i-menu"></label>
+    <div id="bg"></div>
+    <div id="ui"></div>
+    <div id="sidebar"><div id="index"></div></div>
+    <div id="render"></div>
+  </body>
+</html>

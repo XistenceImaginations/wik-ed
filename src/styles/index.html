@@ -1,0 +1,19 @@
+<template id="style-index" lang="ccss">
+  :host
+    display: flex
+    flex-direction: column
+  .tag
+    background-color: hsl(0 0% 100% / .25)
+    border-radius: .25rem
+    padding: 0 1em
+    margin-right: .25em
+    margin-bottom: .5em
+    animation-duration: .5s
+    animation-fill-mode: forwards
+    animation-name: fadeIn
+    display: inline-flex
+    &.--visible >> background-color: hsl(210 100% 75% / .35)
+    #title >> flex: 1
+    #close >> flex: 0
+    #remove >> flex: 0
+</template>

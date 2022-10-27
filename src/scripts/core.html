@@ -1,0 +1,359 @@
+<script id="script-core">
+  // TODO save and restore open entries by not setting just 'visible', instead use their current array-index (-1 for not visible, anything else visible and in this order)
+
+  class Reactive {
+    static property(object, key, value, listener) {
+      if (object && key) {
+        Object.defineProperty(object, key, {
+          get() { return value; },
+          set(newValue) {
+            value = newValue;
+            if (listener) { listener(value, newValue); }
+            if ($$) { $$.propertyChanged(key, value, newValue); }
+          }
+        });
+        object[key] = value;
+      }
+    }
+  }
+
+  class Core {
+    constructor() {
+      this.modules = {};
+      this.searchTerm = undefined;
+      this.searchPause = 0;
+      this.searchDelayer = setInterval(() => {
+        if (this.searchPause > 0) {
+          this.searchPause--;
+          if (this.searchPause == 0) {
+            this.filterAndUpdateEntries();
+          }
+        }
+      }, 100);
+      this.unsaved = false;
+
+      document.addEventListener('DOMContentLoaded', this.init.bind(this));
+    }
+
+    propertyChanged(propertyName, oldValue, newValue) {
+      switch(propertyName) {
+        case 'projectName': document.title = (newValue || '???').trim(); break;
+      }
+      if (this.ready) {
+        this.storeData();
+      }
+    }
+
+    require(id) {
+      return $$?.modules?.[id];
+    }
+
+    init() {
+      // We load styles from templates in a compact way (CCSS - compact cascading style sheets)
+      //  which will be - after loading and parsing - being hold up in JS as style objects (so
+      //  they won't appear in DOM).
+      this.styles = {};
+
+      // Load CCSS-Parser and execute it.
+      $$.require('ccss').parse();
+
+      // Get all essential areas and containers. This should be done before
+      //  adding any further elements or creating/rendering content.
+      this.dataCont = document.querySelector('script#database');
+      this.body = this.handle(document.body).attachStyles('style-icons').get();
+      this.uiDOM = this.handle(document.querySelector('#ui')).shadowed().attachStyles('style-ui', 'style-icons').get();
+      this.renderDOM = this.handle(document.querySelector('#render')).shadowed().attachStyles('style-entry', 'style-icons').get();
+      this.indexDOM = this.handle(document.querySelector('#index')).shadowed().attachStyles('style-index', 'style-icons').get();
+
+      // Converts the global '$properties'-object to a reactive object, property changes will
+      //  trigger registered listeners and will also trigger storing the properties back into
+      //  the data store.
+      Object.keys($properties).forEach(property => Reactive.property($properties, property, $properties[property]));
+
+      // Initial rendering of all entries.
+      $entries
+        .forEach(entry => {
+          this.renderEntry(entry);
+          this.renderEntryKnob(entry);
+        });
+
+      // Create dynamic elements which are not ment to be saved with the page later on.
+      // TODO maybe use <template> and/or shadow tree to write them directly in to the html?
+      this.handle(document.querySelector('#bg')).attachStyles('style-bg').get();
+      this.handle('H1').editable('', '', (id, key, content) => $properties.projectName = content).text($properties.projectName).tooltip('Main title for your project').wrap('DIV').class('title').spawn(this.uiDOM);
+      this.handle('H4').editable('', '', (id, key, content) => $properties.topic = content).text($properties.topic).tooltip('Subtitle or topic for your project').wrap('DIV').class('title').spawn(this.uiDOM);
+      this.handle('SPAN').class('icon', 'i-add').on('click', event => this.addEntry({ id: Date.now(), visible: true })).tooltip('Add a new entry').spawn(this.uiDOM);
+      this.handle('SPAN').class('icon', 'i-download').on('click', event => this.save()).tooltip('Save (download) this project').spawn(this.uiDOM);
+      this.handle('INPUT').attr('type', 'text').class('search').attr('placeholder', 'Enter search term...').tooltip('Search for entries by their title').on('keyup', event => this.search(event.target.value)).spawn(this.uiDOM);
+      this.handle('INPUT').attr('type', 'text').class('autosave').attr('placeholder', 'Autosave filename').tooltip('Autosave filename').text($properties.autosave).on('keyup', event => $properties.autosave = event.target.value).spawn(this.uiDOM);
+
+      // Update views and filters.
+      this.filterAndUpdateEntries();
+      this.filterAndUpdateEntryKnobs();
+
+      setInterval(() => {
+        if (($properties.autosave || '').trim().length > 0) {
+          this.save($properties.autosave);
+        }
+      }, 1000 * 60 * 1);
+
+      // All done, ready to go.
+      this.ready = true;
+    }
+
+    search(term) {
+      this.searchPause = 5;
+      this.searchTerm = term;
+    }
+
+    save(name) {
+      this.unsaved = false;
+      this.updateView();
+      this.download(name ? `${name}.html` : `index-${Date.now()}.html`/* TODO instead of 'index' use title (check for URL/File-conform characters in title) */, '<!doctype html><html>\n' + document.head.outerHTML + document.body.outerHTML + '</html>');
+    }
+
+    download(filename, text) {
+      this.handle('A')
+          .attr('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text))
+          .attr('download', filename)
+          .css('display', 'none')
+          .spawn().click().destroy();
+    }
+
+    renderEntryKnob(data) {
+      this.handle('DIV')
+          .attr('id', 'entry-knob-' + data.id)
+          .attr('class', 'tag')
+          .html(`<span id="title">${data.title || 'n/a'}</span><span id="remove" class="icon i-delete"><span id="close" class="icon i-close"></span>`)
+          .query('#remove', h => h.on('click', event => this.removeEntry(data.id)).tooltip('Delete this entry'))
+          .query('#close', h => h.on('click', event => this.toggleEntryVisibility(data.id, false)).tooltip('Close this entry'))
+          .query('#title', h => h.on('click', event => this.toggleEntryVisibility(data.id, true)))
+          .spawn(this.indexDOM);
+    }
+
+    renderEntry(data) {
+      let isEditing = false;
+      let handle = this.handle('ARTICLE');
+
+      handle
+          .attr('id', 'entry-' + data.id)
+          .css('animationName', 'fadeOut')
+          .css('display', 'none')
+          .html(`<h3><span id="title">${data.title || ''}</span><span id="meta">(${data.id})</span><span class="icon i-edit" id="edit"></span><span class="icon i-delete" id="remove"></span><span class="icon i-close" id="close"></span></h3><div>${$$.require('markdown').parse(this.encodeText(data.content))}</div>`)
+          .query('h3>#close', h => h.on('click', event => this.toggleEntryVisibility(data.id, false)).tooltip('Close this entry'))
+          .query('h3>#remove', h => h.on('click', event => this.removeEntry(data.id)).tooltip('Delete this entry'))
+          .query('h3>#edit', h => h.on('click', event => { handle.fire('edit', isEditing, 'div'); isEditing = !isEditing; }).tooltip('Edit this entry'))
+          .query('div', h => h.on('edit', event => {
+            if (event.detail) {
+              this.updateEntry(data.id, 'content', this.decodeText(h.get().innerText));
+              h.html($$.require('markdown').parse(h.get().innerText || ''));
+            } else {
+              h.text(this.encodeText(data.content));
+            }
+            h.attr('contentEditable', !event.detail);
+          }))
+          .query('h3>#title', h => h.editable(data.id, 'title', (id, key, content) => this.updateEntry(id, key, content)))
+          .spawn(this.renderDOM);
+    }
+
+    decodeText(text) {
+      return (text || '').replaceAll('\n','\\N');
+    }
+
+    encodeText(text) {
+      return (text || '').replaceAll('\\N','\n');
+    }
+
+    // TODO dom-util?
+    handle(elm) {
+      elm = typeof elm === 'string' ? document.createElement(elm) : elm;
+      const handler = {
+        // Converts 'elm' into a shadowed version. All actions following will apply on the shadow-dom.
+        shadowed    : () => { elm = elm.attachShadow({ mode: "open" }); return handler; },
+        // Copies one or more style-definitions into 'elm'. Each id will refer to a 'style'-block using that id.
+        attachStyles: (...styleIds) => {
+          styleIds.forEach(styleId => {
+            if (this.styles[styleId]) {
+              elm.appendChild(this.styles[styleId].cloneNode(true));
+            } else {
+              elm.appendChild(document.querySelector(`style[id=${styleId}]`).cloneNode(true))
+            }
+          });
+          return handler;
+        },
+        wrap        : (tag) => { let wrapper = document.createElement(tag); elm.parentNode ? elm.parentNode.appendChild(wrapper) : null; wrapper.appendChild(elm); elm = wrapper; return handler; },
+        // Sets an attribute on 'elm'.
+        attr        : (key, value) => { elm.setAttribute(key, value); return handler; },
+        // Applies 'str' as inner text to 'elm'.
+        text        : str => { elm.innerText = str; return handler; },
+        // Applies 'str' as inner HTML to 'elm'.
+        html        : str => { elm.innerHTML = str; return handler; },
+        // Fires a custom event.
+        fire        : (type, data, target) => { (target ? typeof target === 'string' ? elm.querySelector(target) : target : elm).dispatchEvent(new CustomEvent(type, { detail: data })); return handler; },
+        // Registering a listener for event 'type'.
+        on          : (type, listener) => { elm.addEventListener(type, event => listener(event, handler)); return handler; },
+        // Sets a single CSS-property. Note that you still need to use correct camel cased key (even as 'string').
+        css         : (prop, value) => { elm.style[prop] = value; return handler; },
+        class       : (...classes) => { classes.forEach(cls => elm.classList.add(cls)); return handler; },
+        // 'Spawns' this element as child in a 'target' (if target is not defined it will be document.body).
+        spawn       : (target) => { (target || document.body).appendChild(elm); return handler; },
+        // Removes this element from its parent (and DOM).
+        destroy     : () => { elm ? elm.remove() : null; return handler; },
+        // Simulates a 'click' on the element.
+        click       : () => { elm.click(); return handler; },
+        // Queries a single element with a selector and invokes a callback with the element wrapped in another handler.
+        query       : (selector, callback) => { callback(this.handle(elm.querySelector(selector))); return handler; },
+        // Makes the element editable.
+        editable    : (id, key, listener, viewHandler) => { this.makeEditable(elm, id, key, listener, viewHandler); return handler; },
+        append      : provider => { let child = provider(elm, handler); child = child instanceof HTMLElement ? child : child.get(); elm.appendChild(child); return handler; },
+        // Returns the element from this handler.
+        tooltip     : tooltip => { elm.setAttribute('title', tooltip || '???'); return handler; },
+        get         : () => elm
+      };
+      return handler;
+    }
+
+    // TODO dom-util?
+    makeEditable(elm, id, key, listener, viewHandler) {
+      elm.contentEditable = true;
+
+      if (viewHandler) {
+        elm.onfocus = event => viewHandler.startEdit ? elm.innerText = viewHandler.startEdit() : null;
+        elm.onblur = event => viewHandler.endEdit ? viewHandler.endEdit(elm.innerText, elm) : null;
+      } else {
+        elm.onfocus = event => elm.originContent = elm.innerHTML;
+        elm.onblur = event => {
+          if (elm.originContent != elm.innerHTML) {
+            if (listener) {
+              listener(id, key, elm.innerHTML);
+            }
+          }
+          delete elm.originContent;
+        };
+      }
+    }
+
+    updateView() {
+      document.body.classList[this.unsaved ? 'add': 'remove']('--unsaved');
+    }
+
+    delay(delay, callback) {
+      let timer = setTimeout(() => {
+        callback();
+        clearTimeout(timer);
+      }, delay);
+    }
+
+    filterAndUpdateEntries() {
+      $entries
+        .forEach(entry => {
+          const
+            idx = $editing.indexOf(entry.id),
+            elm = this.renderDOM.querySelector('#entry-' + entry.id),
+            state = (this.searchTerm ? (entry.title || '').toLowerCase().includes(this.searchTerm.toLowerCase()) : $editing.includes(entry.id)) ? 'fadeIn' : 'fadeOut';
+
+          if (state != elm.style.animationName) {
+            if ('fadeIn' === state) {
+              this.renderDOM.prepend(elm);
+
+              elm.style.order = idx === -1 ? '9999999' : idx;
+
+              this.delay(500, () => elm.style.overflow = 'unset');
+            } else {
+              elm.style.overflow = 'hidden';
+
+              this.delay(500, () => elm.style.order = idx === -1 ? '9999999' : idx);
+            }
+
+            elm.style.display = 'flex';
+            elm.style.animationName = state;
+          }
+        });
+    }
+
+    filterAndUpdateEntryKnobs() {
+      $entries
+        .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+        .forEach(entry => {
+          const elm = this.indexDOM.querySelector('#entry-knob-' + entry.id);
+          this.handle(elm)
+            .query('#title', h => h.text(entry.title || '(n/a)'))
+          // TODO to handler
+          elm.classList[$editing.includes(entry.id) ? 'add' : 'remove']('--visible');
+
+          // TODO BUG closing entries deletes them from index
+          // -------------------------------------------------- this.indexDOM.append(elm);
+        });
+    }
+
+    toggleEntryVisibility(id, isVisible) {
+      let idx = $editing.indexOf(id);
+      if (idx !== -1) {
+        $editing.splice(idx, 1);
+      }
+      if (isVisible) {
+        $editing.unshift(id);
+      }
+
+      this.storeData();
+      this.filterAndUpdateEntries();
+      this.filterAndUpdateEntryKnobs();
+    }
+
+    addEntry(data) {
+      $entries.push(data);
+
+      this.unsaved = true;
+      this.updateView();
+      this.renderEntry(data);
+      this.renderEntryKnob(data);
+      this.toggleEntryVisibility(data.id, true);
+    }
+
+    removeEntry(id) {
+      $entries
+        .filter(entry => entry.id === id)
+        .forEach(entry => {
+          const idx = $entries.indexOf(entry);
+
+          if (idx !== -1) {
+            const elmEntry = this.renderDOM.querySelector('#entry-' + entry.id);
+            const elmEntryKnob = this.indexDOM.querySelector('#entry-knob-' + entry.id);
+
+            elmEntry.style.animationName = 'fadeOut';
+
+            this.delay(500, () => {
+              elmEntry.remove();
+              elmEntryKnob.remove();
+
+              $entries.splice(idx, 1);
+
+              this.updateView();
+              // TODO remove from $editing
+              // TODO use this > toggleEntryVisibility   and remove the three lines below
+              this.storeData()
+              this.filterAndUpdateEntries();
+              this.filterAndUpdateEntryKnobs();
+            });
+          }
+        });
+    }
+
+    updateEntry(id, key, value) {
+      $entries
+          .filter(entry => entry.id === id)
+          .forEach(entry => entry[key] = value);
+      this.storeData();
+      this.filterAndUpdateEntryKnobs();
+    }
+
+    /**
+     * Store all data into the data container (properties and entries).
+     */
+    storeData() {
+      this.dataCont.innerText = `const $properties = ${JSON.stringify($properties, undefined, 0).replace(/\\n/g, '')};const $editing = ${JSON.stringify($editing, undefined, 0)};const $entries = ${JSON.stringify($entries, undefined, 0).replace(/\\n/g, '')};`;
+    }
+  }
+
+const $$ = new Core();
+</script>

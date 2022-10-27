@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <include src='styles/core.html'/>
+    <include src='styles/icons.html'/>
+    <include src='styles/bg.html'/>
+    <include src='styles/ui.html'/>
+    <include src='styles/index.html'/>
+    <include src='styles/entry.html'/>
+    <include src='scripts/core.html'/>
+    <include src='scripts/md-parser.html'/>
+    <include src='scripts/ccss-parser.html'/>
+    <script id="database">
+      const $properties = {projectName: "Wik'ed-Project", topic: "Topic title", autosave: ""};
+      const $editing = [0, 1];
+      const $entries = [{"id":0,"title":"Welcome","content":
+        'This is a self-contained, wiki-like page which you can use as notepad, knowledgebase or similar.\\N' +
+        'Due to its nature you can save/backup your work by saving the page itself, as it contains all current data and all functionality.\\N' +
+        'To save the page use the \'save\' button and not the \'Save page\'-option of your browser (that will break your page).'
+      },{"id":1,"title":"Markup","content":
+        'The content here is written in a simple markdown-ish way:\\N\\N\\N' +
+        '#### This is a header, the more asterisks used (1 to 6) the smaller the header typ\\N' +
+        '*This is italic text*\\N' + 
+        '**This is bold text*\\N' +
+        '[[This is a link|https://www.google.de]]\\N' +
+        '!!This is marked text!!\\N' +
+        '>> Indented Block\\N' +
+        '[[ Boxed Content'
+      }];
+    </script>
+    <title></title>
+  </head>
+  <body>
+    <input type="checkbox" id="sidebar-toggle" hidden>
+    <label for="sidebar-toggle" class="icon i-menu"></label>
+    <div id="bg"></div>
+    <div id="ui"></div>
+    <div id="sidebar"><div id="index"></div></div>
+    <div id="render"></div>
+  </body>
+</html>

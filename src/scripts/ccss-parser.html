@@ -1,0 +1,200 @@
+<script id="script-ccss-parser">
+  class CssNode {
+    constructor(line) {
+      this.line = line.trim();
+      this.parent = undefined;
+      this.children = [];
+      this.selectors = [];
+      this.key = undefined;
+      this.value = undefined;
+      this.isConcatenated = this.line.charCodeAt(this.line.length -1) == 44;
+      this.isProperty = false;
+
+      let chr = this.line.charCodeAt(0);
+
+      if (this.isConcatenated) {
+        this.line = this.line.substring(0, this.line.length - 1);
+      }
+      let colonIdx = line.indexOf(':');
+
+      // We epxect that a property is defined by a colon followed by a space, otherwise it must
+      //  be some kind of pseudo class or property or selector of any kind.
+      if (colonIdx != -1 && line.charAt(colonIdx + 1) === ' ') {
+        this.key = line.substring(0, colonIdx).trim();
+        this.value = line.substring(colonIdx + 1).trim();
+        this.isProperty = true;
+      } else {
+        this.selectors.push(this.line);
+      }
+    }
+
+    merge(otherNode) {
+      this.selectors.push(...otherNode.selectors);
+    }
+  }
+
+  // Register module.
+  ($$?.modules||{})['ccss'] = class CCSSParser {
+    static parse() {
+      return new CCSSParser();
+    }
+
+    constructor() {
+      Array
+        // Get all CCSS(Compact CSS) - Blocks
+        .from(document.head.querySelectorAll('[lang=ccss]'))
+        .forEach(block => this.render(block, this.build(this.parse(this.validate(block.content.textContent)), [''], '')));
+    }
+
+    validate(text) {
+      let lines = [];
+
+      text.split('\n')
+        // Remove single line comments.
+        .filter(line => !line.trim().startsWith('//'))
+        // Remove empty lines.
+        .filter(line => line.trim().length > 0)
+        // Parses 'single line'-rules (one selector with just one property, can be written as '<Selector> >> <Property>').
+        .forEach((line, i) => {
+          if (line.includes('>>')) {
+            let indent = this.indentOf(line);
+            let singleLine = line.split('>>');
+            lines.push(' '.repeat(indent) + singleLine[0].trim());
+            lines.push(' '.repeat(indent + 2) + singleLine[1].trim());
+          } else {
+            lines.push(line);
+          }
+        });
+
+      // Check if there are spaces used as indent (and only spaces).
+      let containsSpacesOnly = lines.filter(line => !/^ *\S/.test(line)).length === 0;
+      // Check if there are tabs used as indent (and only tabs).
+      let containsTabsOnly = lines.filter(line => !/^\t*\S/.test(line)).length === 0;
+      // Check either tabs or spaces are used as indent.
+      let containsBoth = lines.some(line => !containsSpacesOnly && !containsTabsOnly && /^\W*\S/.test(line));
+      let isValid = !containsBoth && (containsSpacesOnly || containsTabsOnly);
+
+      if (!isValid) {
+        throw new Error('CCSS-definition contains a mix of spaces and tabs.');
+      }
+      return lines;
+    }
+
+    parse(lines) {
+      // The smallest indent is used as root-indent, all other line-indents
+      //  will be subtracted by this root-indent, so we're starting virtually
+      //  with indent 0.
+      const smallestIndent = Math.min(...lines.map(this.indentOf));
+      lines = lines.map(line => line.substring(smallestIndent));
+
+      let root = new CssNode('');
+      let parentNode = root;
+      let lastNode = root;
+      let currentNode = undefined;
+      let lastIndent = -1;
+      let currentIndent = undefined;
+      let createAndAdd = line => {
+        currentNode = new CssNode(line);
+        currentNode.parent = parentNode;
+        parentNode.children.push(currentNode);
+        lastNode = currentNode;
+      };
+
+      lines.forEach(line => {
+        currentIndent = this.indentOf(line) / 2/* spaces*/;
+
+        if (currentIndent > lastIndent) { // down
+          parentNode = lastNode;
+
+          createAndAdd(line);
+        } else if (currentIndent < lastIndent) { // up
+          while(currentIndent < lastIndent) {
+            parentNode = parentNode.parent;
+            lastIndent--;
+          }
+
+          createAndAdd(line);
+        } else { // same
+          if (lastNode.isConcatenated) {
+            lastNode.merge(new CssNode(line));
+          } else {
+            createAndAdd(line);
+          }
+        }
+        lastIndent = currentIndent;
+      });
+      return root;
+    }
+
+    build(node, upperSelectors=[], cssJson) {
+      let mergedSelectors = [];
+      let properties = {};
+      let hasProperties = false;
+      let wrapper = undefined;
+
+      node.selectors.forEach(selector => {
+        upperSelectors.forEach(upperSelector => {
+          // Check for queries. We mark that we have a query currently,
+          //  as these will set up a special wrappers around standard CSS-Rule
+          //  we have to render.
+          if (selector.charAt(0) === '@') {
+            wrapper = selector;
+          }
+
+          let mergedSelector;
+          if (selector.charAt('0') === '&') {
+            mergedSelector = (selector.replaceAll('&', upperSelector)).trim();
+          } else {
+            mergedSelector = (upperSelector + ' ' + selector.replaceAll('&', upperSelector)).trim();
+          }
+          // If a wrapper is set we won't use the query-selector itself in
+          //  our merged selectors, so we strip it out.
+          if (wrapper && mergedSelector.startsWith(mergedSelector)) {
+            mergedSelector = mergedSelector.substring(wrapper.length).trim();
+          }
+
+          mergedSelectors.push(mergedSelector);
+        });
+      });
+      node.children.forEach(child => {
+        if (child.isProperty) {
+          hasProperties = true;
+          properties[child.key.trim()] = child.value.trim();
+        }
+      });
+      if (wrapper) {
+        cssJson += wrapper + '{\n';
+      }
+      if (hasProperties) {
+        mergedSelectors.forEach(selector => {
+          cssJson += selector + ' {\n';
+          Object.keys(properties).forEach(key => cssJson += '  ' + key + ': ' + properties[key] + ';\n');
+          cssJson += '}\n';
+        });
+      }
+      node.children.forEach(child => {
+        if (!child.isProperty) {
+          cssJson = this.build(child, mergedSelectors, cssJson);
+        }
+      });
+      if (wrapper) {
+        cssJson += '}\n';
+      }
+      return cssJson;
+    }
+
+    render(block, cssJson) {
+      let style = document.createElement('STYLE');
+      let head = document.head || document.getElementsByTagName('head')[0];
+      style.id = block.id;
+      style.type = 'text/css';
+      style.innerHTML = cssJson;
+
+      $$.styles[block.id] = style;
+    }
+
+    indentOf(line) {
+      return line.search(/\S|$/);
+    }
+  }
+</script>
