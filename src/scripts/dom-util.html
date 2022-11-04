@@ -1,0 +1,172 @@
+<script id="script-dom-utils">
+  /**
+   * Utilities to handle DOM-related tasks.
+   */
+  window.$d = (elmRef, ref) => {
+    // Set the content of 'elm'. If 'content' is of type 'string'
+    //  it sets it directly as HTML. If it is an object, the object
+    //  needs to define either the key 'text' or 'html' with the content
+    //  to set, then the corresponding innerText/innerHTML is used.
+    const setContent = (elm, content) => {
+      if (typeof content === 'string') {
+        elm.innerHTML = content;
+      } else if (content.html) {
+        elm.innerHTML = content.html;
+      } else if (content.text) {
+        elm.innerText = content.text;
+      }
+    }
+
+    // Iterates through all attributes and text nodes to search for placeholder
+    //  for variables ('{variableA}').
+    const attrTextPropertyHandler = (elm, prepare, attrHandler, textHandler) => {
+      const injectRegex = /\{([^\}]*)\}/;
+      let result;
+
+      // Check all attributes.
+      for(const attr of elm.attributes) {
+        let [ attrName, attrModifiers = '' ] = attr.name.split('|');
+        attrModifiers = attrModifiers.split(',').map(attr => attr.trim().toLowerCase());
+
+        if (result = injectRegex.exec(`${attr.value}`)) {
+          let varName = result?.[1] || ''; // Get the variable name.
+
+          attrHandler?.(result, attr);
+
+          // If the attribute is 'text' (custom), then we use the content
+          //  and apply it as innerText to 'elm'.
+          if (attrName === 'text') {
+            // If we're in a prepare-state we also make 'elm' editable and
+            //  we're listening to changes to apply back the change to the
+            //  variable.
+            if (prepare && attrModifiers.includes('editable')) {
+              elm.setAttribute('contenteditable', true);
+              elm.onblur = event => {
+                // We can even use functions which might return a string.
+                // In that case we have to check this, as we cannot assign
+                //  a value to a function (illegal left-hand assign).
+                if (eval(`typeof ${varName}`) === 'string') {
+                  eval(`${varName} = '${elm.innerText.replaceAll('\'', '\\\'').replaceAll('\n', '\\N')}'`)
+                }
+              };
+            }
+            // Apply the variable content as text.
+            console.log(varName);
+            setContent(elm, eval(varName) || '???');
+          }
+          if (attrName.startsWith('on:')) {
+            let eventType = attrName.substring(3).trim();
+            let eventCode = attr.value.substring(1, attr.value.length - 1).trim();
+            // 'edit' is a special event where we either set the element
+            //  to be content editable, but also listen to 'blur' so we
+            //  can trigger the listener.
+            if (eventType === 'edit') {
+              elm.setAttribute('contenteditable', true);
+              elm.addEventListener('blur', event => {
+                // Setting 'editedValue' makes it available in the scope of
+                //  of the evaluated 'eventCode', so we can access it right there.
+                let editedValue = event.target.innerHTML;
+                eval(eventCode);
+              });
+            } else if (eventType === 'toggled-edit') {
+              $e.add('toggled-edit', (target) => {
+                elm.isEditing = !elm.isEditing;
+
+                if (elm === target) {
+                  elm.setAttribute('contenteditable', elm.isEditing);
+                  elm.classList[elm.isEditing ? 'add' : 'remove']('--editing');
+
+                  let isEditing = elm.isEditing;
+                  setContent(elm, eval(eventCode));
+                }
+              });
+            } else {
+              elm.addEventListener(eventType, event => eval(eventCode));
+            }
+          }
+        } else {
+          // If the attribute is 'text' (custom), then we use the content
+          //  and apply it as innerText to 'elm'.
+          if (attrName === 'text') {
+            setContent(elm, attr.value);
+          }
+        }
+      }
+      // Check all text nodes.
+      for(const node of elm.childNodes) {
+        if (node.constructor?.name === 'Text'
+            && (result = injectRegex.exec(node.textContent))) {
+          textHandler?.(result, node);
+        }
+      }
+    };
+
+    // Helper function to parse a HTML-String into a HTML-contruct.
+    const templateParser = (templateStr) => {
+      let template = document.createElement('TEMPLATE');
+      let injectRegex = /\{([^\}]*)\}/;
+      template.innerHTML = templateStr;
+
+      Array
+        .from(template.content?.querySelectorAll('*'))
+        .forEach(elm => {
+          // Check all attributes and text nodes. If any contains placeholders ('{...}')
+          //  we register it as 'reactive', so will get informed about property-changes.
+          attrTextPropertyHandler(elm, true,
+            (result, attr) => result ? window.$d.reactives.push({ elm, attr }) : null,
+            (result, node) => result ? window.$d.reactives.push({ elm, node }) : null);
+        });
+
+      return template.content?.childNodes?.[0];
+    }
+
+    if (typeof elmRef === 'string') {
+      // We test if the string starts with a '<', which indicates that a HTML-String begins.
+      //  We parse the HTML-string and use its result as new 'elmRef'...
+      if (elmRef.startsWith('<')) {
+        elmRef = templateParser(elmRef);
+      } else
+      // ...we can also define queries by using a CSS-selector string followed by a question mark, which
+      //  indicates we want to query something...
+      if (elmRef.endsWith('?')) {
+        elmRef = elmRef.substring(0, elmRef.length - 1).trim();
+        elmRef = ref ? ref.querySelector?.() : document.querySelector(elmRef);
+      // ... otherwise we take the string as HTML-Tag declaration to create such element.
+      } else {
+        elmRef = document.createElement(elmRef);
+      }
+    }
+
+    // Handler object which contains the current element and provides different
+    //  functions to manipulate that element.
+    const handler = {
+      toggle      : (condition, ...classes) => { elmRef.classList[condition ? 'add' : 'remove'](classes); return handler; },
+      // Converts 'elmRef' into a shadowed version. All actions following will apply on the shadow-dom.
+      shadowed    : () => { elmRef = elmRef.attachShadow({ mode: "open" }); return handler; },
+      // Copies one or more style-definitions into 'elmRef'. Each id will refer to a 'style'-block using that id.
+      attachStyles: (...styleIds) => { styleIds.forEach(styleId => elmRef.appendChild(($.styles[styleId] ? $.styles[styleId] : document.querySelector(`style[id=${styleId}]`)).cloneNode(true))); return handler; },
+      // Sets an attribute on 'elmRef'.
+      attr        : (key, value) => { elmRef.setAttribute(key, value); return handler; },
+      // Applies 'str' as inner text to 'elmRef'.
+      text        : (str) => { elmRef.innerText = str; return handler; },
+      // Applies 'str' as inner HTML to 'elmRef'.
+      html        : (str) => { elmRef.innerHTML = str; return handler; },
+      // Sets a single CSS-property. Note that you still need to use correct camel cased key (even as 'string').
+      css         : (prop, value) => { elmRef.style[prop] = value; return handler; },
+      // 'Spawns' this element as child in a 'target' (if target is not defined it will be document.body).
+      spawn       : (target) => { (target || document.body).appendChild(elmRef); return handler; },
+      // Removes this element from its parent (and DOM).
+      destroy     : () => { elmRef ? elmRef.remove() : null; return handler; },
+      // Simulates a 'click' on the element.
+      click       : () => { elmRef.click(); return handler; },
+      // Queries a single element with a selector and invokes a callback with the element wrapped in another handler.
+      query       : (selector, callback) => { callback($d(elmRef.querySelector(selector))); return handler; },
+      // Appends this element to a parent. 'provider' will be a callback where the current element and handler will be passed and a child-instance should be returned.
+      append      : (provider) => { let child = provider(elmRef, handler); child = child instanceof HTMLElement ? child : child.get(); elmRef.appendChild(child); return handler; },
+      // Returns the element from this handler.
+      get         : () => elmRef
+    };
+    return handler;
+  };
+  window.$d.reactives = [];
+</script>

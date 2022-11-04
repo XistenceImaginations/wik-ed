@@ -8,13 +8,14 @@
     <include src='styles/ui.html'/>
     <include src='styles/index.html'/>
     <include src='styles/entry.html'/>
+    <include src='scripts/dom-util.html'/>
     <include src='scripts/core.html'/>
     <include src='scripts/md-parser.html'/>
     <include src='scripts/ccss-parser.html'/>
     <script id="database">
-      const $properties = {projectName: "Wik'ed-Project", topic: "Topic title", autosave: ""};
-      const $editing = [0, 1];
-      const $entries = [{"id":0,"title":"Welcome","content":
+      $.properties = {projectName: "Wik'ed-Project", topic: "Topic title"};
+      $.editing = [0, 1];
+      $.entries = [{"id":0,"title":"Welcome","content":
         'This is a self-contained, wiki-like page which you can use as notepad, knowledgebase or similar.\\N' +
         'Due to its nature you can save/backup your work by saving the page itself, as it contains all current data and all functionality.\\N' +
         'To save the page use the \'save\' button and not the \'Save page\'-option of your browser (that will break your page).'
@@ -29,7 +30,6 @@
         '[[ Boxed Content'
       }];
     </script>
-    <title></title>
   </head>
   <body>
     <input type="checkbox" id="sidebar-toggle" hidden>

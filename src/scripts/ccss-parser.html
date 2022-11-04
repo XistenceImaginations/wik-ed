@@ -19,7 +19,7 @@
 
       // We epxect that a property is defined by a colon followed by a space, otherwise it must
       //  be some kind of pseudo class or property or selector of any kind.
-      if (colonIdx != -1 && line.charAt(colonIdx + 1) === ' ') {
+      if (colonIdx != -1 && !line.startsWith('@') && line.charAt(colonIdx + 1) === ' ') {
         this.key = line.substring(0, colonIdx).trim();
         this.value = line.substring(colonIdx + 1).trim();
         this.isProperty = true;
@@ -34,7 +34,7 @@
   }
 
   // Register module.
-  ($$?.modules||{})['ccss'] = class CCSSParser {
+  ($?.modules||{})['ccss'] = class CCSSParser {
     static parse() {
       return new CCSSParser();
     }
@@ -70,7 +70,7 @@
       let containsSpacesOnly = lines.filter(line => !/^ *\S/.test(line)).length === 0;
       // Check if there are tabs used as indent (and only tabs).
       let containsTabsOnly = lines.filter(line => !/^\t*\S/.test(line)).length === 0;
-      // Check either tabs or spaces are used as indent.
+      // Check if either tabs or spaces are used as indent.
       let containsBoth = lines.some(line => !containsSpacesOnly && !containsTabsOnly && /^\W*\S/.test(line));
       let isValid = !containsBoth && (containsSpacesOnly || containsTabsOnly);
 
@@ -190,7 +190,7 @@
       style.type = 'text/css';
       style.innerHTML = cssJson;
 
-      $$.styles[block.id] = style;
+      $.styles[block.id] = style;
     }
 
     indentOf(line) {

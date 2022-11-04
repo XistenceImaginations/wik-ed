@@ -4,8 +4,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style id="style-core">
 :root{
+  --hPrimary: 60deg;
+  --colPrimaryHSL: var(--hPrimary) 100% 50%;
+  --colPrimaryLightHSL: var(--hPrimary) 75% 50%;
   --sizeSidebar: min(80vw, 300px);
-  --sizeSidebarHeader: 32px;
+  --sizeSidebarHeader: 48px;
 }
 *{
   box-sizing: border-box;
@@ -57,7 +60,7 @@ label[for=sidebar-toggle] {
   backdrop-filter: blur(.5em);
 }
 #render{
-  --padding: 2em;
+  --padding: 0em;
   transition: all .5s;
   width: calc(100% - var(--padding));
   transform: translateX(var(--padding));
@@ -94,6 +97,14 @@ label[for=sidebar-toggle] {
 #sidebar-toggle:checked ~ #sidebar {
   transform: translateX(0);
   box-shadow: 0 0 1.5em hsl(0deg 0% 0% / .125);
+}
+@media (min-width: 576px) {
+  :root {
+    --sizeSidebarHeader: 32px;
+  }
+  #render{
+    --padding: 2em;
+  }
 }
 
 @media (min-width: 576px) {
@@ -323,11 +334,9 @@ label[for=sidebar-toggle] {
     pointer-events: none
     z-index: -1
     overflow: hidden
-    background: url('https://images.unsplash.com/photo-1454117096348-e4abbeba002c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80')
     background-size: cover
     background-position: center
-    opacity: .5
-    filter: contrast(2) brightness(.1) grayscale(1)
+    background-image: linear-gradient(-225deg, hsl(var(--colPrimaryHSL) / .1) 200px, transparent 200px)
 </template>
     <template id="style-ui" lang="ccss">
   * >> box-sizing: border-box
@@ -335,7 +344,7 @@ label[for=sidebar-toggle] {
     display: flex
     flex-wrap: wrap
     gap: 5px
-    background-image: linear-gradient(-45deg, transparent 75%, hsl(210deg 100% 50% / .1) 75%)
+    background-image: linear-gradient(-225deg, hsl(var(--colPrimaryHSL) / .1) 300px, transparent 300px)
     padding: 2em
   input[type=text]
     outline: 0px solid transparent
@@ -369,7 +378,6 @@ label[for=sidebar-toggle] {
     transition: all .5s
     box-shadow: 0 0 .75em -.25em hsl(0deg 0% 0% / .5)
     &:hover >> background-color: hsl(0deg 0% 100% / .25)
-  .autosave,
   .search
     font-size: 1em
     border-radius: .25rem
@@ -385,6 +393,7 @@ label[for=sidebar-toggle] {
   :host
     display: flex
     flex-direction: column
+    background-image: linear-gradient(-45deg, hsl(var(--colPrimaryHSL) / .05) 300px, transparent 300px)
   .tag
     background-color: hsl(0 0% 100% / .25)
     border-radius: .25rem
@@ -395,7 +404,7 @@ label[for=sidebar-toggle] {
     animation-fill-mode: forwards
     animation-name: fadeIn
     display: inline-flex
-    &.--visible >> background-color: hsl(210 100% 75% / .35)
+    &.--visible >> background-color: hsl(var(--colPrimaryLightHSL) / .35)
     #title >> flex: 1
     #close >> flex: 0
     #remove >> flex: 0
@@ -446,6 +455,9 @@ label[for=sidebar-toggle] {
   article>div
     flex: 1
     margin-left: 1em
+    border: 1px dashed hsl(0deg 0% 100% / 0)
+  article>div.--editing
+    border: 1px dashed hsl(0deg 0% 100% / .25)
   article>div:empty::before
     pointer-events: none
     content: 'Enter some text'
@@ -463,12 +475,19 @@ label[for=sidebar-toggle] {
     align-items: center
   article>h3>.icon >> cursor: pointer
   article>h3>#title >> flex: 1
-  article>h3>#meta >> flex: 0
   article>h3>#title:empty::before
     pointer-events: none
     content: 'Enter a title'
     color: currentColor
-    opacity: .5  
+    opacity: .5
+  article:hover
+    box-shadow: inset 0 0 20px hsl(0 0% 100% / .25), inset 0 0 0 1px hsl(0 0% 100% / .05)
+  label
+    position: absolute
+    right: .5em
+    bottom: .25em
+    font-size: .6em
+    opacity: .35
   @keyframes fadeIn
     0%
       margin-bottom: 0
@@ -492,6 +511,178 @@ label[for=sidebar-toggle] {
       flex-basis: 0
       opacity: 0
 </template>
+    <script id="script-dom-utils">
+  /**
+   * Utilities to handle DOM-related tasks.
+   */
+  window.$d = (elmRef, ref) => {
+    // Set the content of 'elm'. If 'content' is of type 'string'
+    //  it sets it directly as HTML. If it is an object, the object
+    //  needs to define either the key 'text' or 'html' with the content
+    //  to set, then the corresponding innerText/innerHTML is used.
+    const setContent = (elm, content) => {
+      if (typeof content === 'string') {
+        elm.innerHTML = content;
+      } else if (content.html) {
+        elm.innerHTML = content.html;
+      } else if (content.text) {
+        elm.innerText = content.text;
+      }
+    }
+
+    // Iterates through all attributes and text nodes to search for placeholder
+    //  for variables ('{variableA}').
+    const attrTextPropertyHandler = (elm, prepare, attrHandler, textHandler) => {
+      const injectRegex = /\{([^\}]*)\}/;
+      let result;
+
+      // Check all attributes.
+      for(const attr of elm.attributes) {
+        let [ attrName, attrModifiers = '' ] = attr.name.split('|');
+        attrModifiers = attrModifiers.split(',').map(attr => attr.trim().toLowerCase());
+
+        if (result = injectRegex.exec(`${attr.value}`)) {
+          let varName = result?.[1] || ''; // Get the variable name.
+
+          attrHandler?.(result, attr);
+
+          // If the attribute is 'text' (custom), then we use the content
+          //  and apply it as innerText to 'elm'.
+          if (attrName === 'text') {
+            // If we're in a prepare-state we also make 'elm' editable and
+            //  we're listening to changes to apply back the change to the
+            //  variable.
+            if (prepare && attrModifiers.includes('editable')) {
+              elm.setAttribute('contenteditable', true);
+              elm.onblur = event => {
+                // We can even use functions which might return a string.
+                // In that case we have to check this, as we cannot assign
+                //  a value to a function (illegal left-hand assign).
+                if (eval(`typeof ${varName}`) === 'string') {
+                  eval(`${varName} = '${elm.innerText.replaceAll('\'', '\\\'').replaceAll('\n', '\\N')}'`)
+                }
+              };
+            }
+            // Apply the variable content as text.
+            console.log(varName);
+            setContent(elm, eval(varName) || '???');
+          }
+          if (attrName.startsWith('on:')) {
+            let eventType = attrName.substring(3).trim();
+            let eventCode = attr.value.substring(1, attr.value.length - 1).trim();
+            // 'edit' is a special event where we either set the element
+            //  to be content editable, but also listen to 'blur' so we
+            //  can trigger the listener.
+            if (eventType === 'edit') {
+              elm.setAttribute('contenteditable', true);
+              elm.addEventListener('blur', event => {
+                // Setting 'editedValue' makes it available in the scope of
+                //  of the evaluated 'eventCode', so we can access it right there.
+                let editedValue = event.target.innerHTML;
+                eval(eventCode);
+              });
+            } else if (eventType === 'toggled-edit') {
+              $e.add('toggled-edit', (target) => {
+                elm.isEditing = !elm.isEditing;
+
+                if (elm === target) {
+                  elm.setAttribute('contenteditable', elm.isEditing);
+                  elm.classList[elm.isEditing ? 'add' : 'remove']('--editing');
+
+                  let isEditing = elm.isEditing;
+                  setContent(elm, eval(eventCode));
+                }
+              });
+            } else {
+              elm.addEventListener(eventType, event => eval(eventCode));
+            }
+          }
+        } else {
+          // If the attribute is 'text' (custom), then we use the content
+          //  and apply it as innerText to 'elm'.
+          if (attrName === 'text') {
+            setContent(elm, attr.value);
+          }
+        }
+      }
+      // Check all text nodes.
+      for(const node of elm.childNodes) {
+        if (node.constructor?.name === 'Text'
+            && (result = injectRegex.exec(node.textContent))) {
+          textHandler?.(result, node);
+        }
+      }
+    };
+
+    // Helper function to parse a HTML-String into a HTML-contruct.
+    const templateParser = (templateStr) => {
+      let template = document.createElement('TEMPLATE');
+      let injectRegex = /\{([^\}]*)\}/;
+      template.innerHTML = templateStr;
+
+      Array
+        .from(template.content?.querySelectorAll('*'))
+        .forEach(elm => {
+          // Check all attributes and text nodes. If any contains placeholders ('{...}')
+          //  we register it as 'reactive', so will get informed about property-changes.
+          attrTextPropertyHandler(elm, true,
+            (result, attr) => result ? window.$d.reactives.push({ elm, attr }) : null,
+            (result, node) => result ? window.$d.reactives.push({ elm, node }) : null);
+        });
+
+      return template.content?.childNodes?.[0];
+    }
+
+    if (typeof elmRef === 'string') {
+      // We test if the string starts with a '<', which indicates that a HTML-String begins.
+      //  We parse the HTML-string and use its result as new 'elmRef'...
+      if (elmRef.startsWith('<')) {
+        elmRef = templateParser(elmRef);
+      } else
+      // ...we can also define queries by using a CSS-selector string followed by a question mark, which
+      //  indicates we want to query something...
+      if (elmRef.endsWith('?')) {
+        elmRef = elmRef.substring(0, elmRef.length - 1).trim();
+        elmRef = ref ? ref.querySelector?.() : document.querySelector(elmRef);
+      // ... otherwise we take the string as HTML-Tag declaration to create such element.
+      } else {
+        elmRef = document.createElement(elmRef);
+      }
+    }
+
+    // Handler object which contains the current element and provides different
+    //  functions to manipulate that element.
+    const handler = {
+      toggle      : (condition, ...classes) => { elmRef.classList[condition ? 'add' : 'remove'](classes); return handler; },
+      // Converts 'elmRef' into a shadowed version. All actions following will apply on the shadow-dom.
+      shadowed    : () => { elmRef = elmRef.attachShadow({ mode: "open" }); return handler; },
+      // Copies one or more style-definitions into 'elmRef'. Each id will refer to a 'style'-block using that id.
+      attachStyles: (...styleIds) => { styleIds.forEach(styleId => elmRef.appendChild(($.styles[styleId] ? $.styles[styleId] : document.querySelector(`style[id=${styleId}]`)).cloneNode(true))); return handler; },
+      // Sets an attribute on 'elmRef'.
+      attr        : (key, value) => { elmRef.setAttribute(key, value); return handler; },
+      // Applies 'str' as inner text to 'elmRef'.
+      text        : (str) => { elmRef.innerText = str; return handler; },
+      // Applies 'str' as inner HTML to 'elmRef'.
+      html        : (str) => { elmRef.innerHTML = str; return handler; },
+      // Sets a single CSS-property. Note that you still need to use correct camel cased key (even as 'string').
+      css         : (prop, value) => { elmRef.style[prop] = value; return handler; },
+      // 'Spawns' this element as child in a 'target' (if target is not defined it will be document.body).
+      spawn       : (target) => { (target || document.body).appendChild(elmRef); return handler; },
+      // Removes this element from its parent (and DOM).
+      destroy     : () => { elmRef ? elmRef.remove() : null; return handler; },
+      // Simulates a 'click' on the element.
+      click       : () => { elmRef.click(); return handler; },
+      // Queries a single element with a selector and invokes a callback with the element wrapped in another handler.
+      query       : (selector, callback) => { callback($d(elmRef.querySelector(selector))); return handler; },
+      // Appends this element to a parent. 'provider' will be a callback where the current element and handler will be passed and a child-instance should be returned.
+      append      : (provider) => { let child = provider(elmRef, handler); child = child instanceof HTMLElement ? child : child.get(); elmRef.appendChild(child); return handler; },
+      // Returns the element from this handler.
+      get         : () => elmRef
+    };
+    return handler;
+  };
+  window.$d.reactives = [];
+</script>
     <script id="script-core">
   // TODO save and restore open entries by not setting just 'visible', instead use their current array-index (-1 for not visible, anything else visible and in this order)
 
@@ -503,13 +694,24 @@ label[for=sidebar-toggle] {
           set(newValue) {
             value = newValue;
             if (listener) { listener(value, newValue); }
-            if ($) { $.propertyChanged(key, value, newValue); }
+            if ($e) { $e.fire('property-changed', { key, oldValue: value, newValue }); }
           }
         });
         object[key] = value;
       }
     }
   }
+
+  class EventEmitter extends Array {
+    static add(type, listener) {
+      (EventEmitter[type] || (EventEmitter[type] = [])).push(listener);
+    }
+
+    static fire(type, event) {
+      (EventEmitter[type] || []).forEach(listener => listener?.(event));
+    }
+  }
+  const $e = EventEmitter;
 
   class Core {
     constructor() {
@@ -526,12 +728,14 @@ label[for=sidebar-toggle] {
       }, 100);
       this.unsaved = false;
 
+      $e.add('property-changed', this.propertyChanged.bind(this));
+
       document.addEventListener('DOMContentLoaded', this.init.bind(this));
     }
 
-    propertyChanged(propertyName, oldValue, newValue) {
-      switch(propertyName) {
-        case 'projectName': document.title = (newValue || '???').trim(); break;
+    propertyChanged(event) {
+      switch(event.key) {
+        case 'projectName': document.title = (event.newValue || '???').trim(); break;
       }
       if (this.ready) {
         this.storeData();
@@ -554,42 +758,34 @@ label[for=sidebar-toggle] {
       // Get all essential areas and containers. This should be done before
       //  adding any further elements or creating/rendering content.
       this.dataCont = document.querySelector('script#database');
-      this.body = this.handle(document.body).attachStyles('style-icons').get();
-      this.uiDOM = this.handle(document.querySelector('#ui')).shadowed().attachStyles('style-ui', 'style-icons').get();
-      this.renderDOM = this.handle(document.querySelector('#render')).shadowed().attachStyles('style-entry', 'style-icons').get();
-      this.indexDOM = this.handle(document.querySelector('#index')).shadowed().attachStyles('style-index', 'style-icons').get();
+      this.body = $d(document.body).attachStyles('style-icons').get();
+      this.uiDOM = $d('#ui?').shadowed().attachStyles('style-ui', 'style-icons').get();
+      this.renderDOM = $d('#render?').shadowed().attachStyles('style-entry', 'style-icons').get();
+      this.indexDOM = $d('#index?').shadowed().attachStyles('style-index', 'style-icons').get();
 
-      // Converts the global '$properties'-object to a reactive object, property changes will
+      // Converts the global '$.properties'-object to a reactive object, property changes will
       //  trigger registered listeners and will also trigger storing the properties back into
       //  the data store.
-      Object.keys($properties).forEach(property => Reactive.property($properties, property, $properties[property]));
+      Object.keys($.properties).forEach(property => Reactive.property($.properties, property, $.properties[property]));
 
       // Initial rendering of all entries.
-      $entries
+      $.entries
         .forEach(entry => {
           this.renderEntry(entry);
           this.renderEntryKnob(entry);
         });
 
       // Create dynamic elements which are not ment to be saved with the page later on.
-      // TODO maybe use <template> and/or shadow tree to write them directly in to the html?
-      this.handle(document.querySelector('#bg')).attachStyles('style-bg').get();
-      this.handle('H1').editable('', '', (id, key, content) => $properties.projectName = content).text($properties.projectName).tooltip('Main title for your project').wrap('DIV').class('title').spawn(this.uiDOM);
-      this.handle('H4').editable('', '', (id, key, content) => $properties.topic = content).text($properties.topic).tooltip('Subtitle or topic for your project').wrap('DIV').class('title').spawn(this.uiDOM);
-      this.handle('SPAN').class('icon', 'i-add').on('click', event => this.addEntry({ id: Date.now(), visible: true })).tooltip('Add a new entry').spawn(this.uiDOM);
-      this.handle('SPAN').class('icon', 'i-download').on('click', event => this.save()).tooltip('Save (download) this project').spawn(this.uiDOM);
-      this.handle('INPUT').attr('type', 'text').class('search').attr('placeholder', 'Enter search term...').tooltip('Search for entries by their title').on('keyup', event => this.search(event.target.value)).spawn(this.uiDOM);
-      this.handle('INPUT').attr('type', 'text').class('autosave').attr('placeholder', 'Autosave filename').tooltip('Autosave filename').text($properties.autosave).on('keyup', event => $properties.autosave = event.target.value).spawn(this.uiDOM);
+      $d('#bg?').attachStyles('style-bg').get();
+      $d('<div class="title"><h1 text|editable="{$.properties.projectName}" title="Main title for your project"></h1></div>').spawn(this.uiDOM);
+      $d('<div class="title"><h4 text|editable="{$.properties.topic}" title="Subtitle or topic for your project"></h4></div>').spawn(this.uiDOM);
+      $d('<span class="icon i-add" on:click="{$.addEntry({ id: Date.now(), visible: true })}" title="Add a new entry"></span>').spawn(this.uiDOM);
+      $d('<span class="icon i-download" on:click="{$.save()}" title="Save (download) this project"></span>').spawn(this.uiDOM);
+      $d('<input class="search" type="text" placeholder="Enter search term..." on:keyup="{$.search(event.target.value)}" title="Search for entries by their title">').spawn(this.uiDOM);
 
       // Update views and filters.
       this.filterAndUpdateEntries();
       this.filterAndUpdateEntryKnobs();
-
-      setInterval(() => {
-        if (($properties.autosave || '').trim().length > 0) {
-          this.save($properties.autosave);
-        }
-      }, 1000 * 60 * 1);
 
       // All done, ready to go.
       this.ready = true;
@@ -607,36 +803,52 @@ label[for=sidebar-toggle] {
     }
 
     download(filename, text) {
-      this.handle('A')
-          .attr('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text))
-          .attr('download', filename)
-          .css('display', 'none')
-          .spawn().click().destroy();
+      $d('A')
+        .attr('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text))
+        .attr('download', filename)
+        .css('display', 'none')
+        .spawn().click().destroy();
     }
 
     renderEntryKnob(data) {
-      this.handle('DIV')
-          .attr('id', 'entry-knob-' + data.id)
-          .attr('class', 'tag')
-          .html(`<span id="title">${data.title || 'n/a'}</span><span id="remove" class="icon i-delete"><span id="close" class="icon i-close"></span>`)
-          .query('#remove', h => h.on('click', event => this.removeEntry(data.id)).tooltip('Delete this entry'))
-          .query('#close', h => h.on('click', event => this.toggleEntryVisibility(data.id, false)).tooltip('Close this entry'))
-          .query('#title', h => h.on('click', event => this.toggleEntryVisibility(data.id, true)))
-          .spawn(this.indexDOM);
+      $d(
+`<div id="entry-knob-${data.id}" class="tag">
+<span id="title" on:click="{$.toggleEntryVisibility(${data.id}, true)}">${data.title || 'n/a'}</span>
+<span class="icon i-delete" on:click="{$.removeEntry(${data.id})}"></span>
+<span class="icon i-close" on:click="{$.toggleEntryVisibility(${data.id}, false)}"></span>
+</div>`
+      ).spawn(this.indexDOM);
     }
 
     renderEntry(data) {
-      let isEditing = false;
-      let handle = this.handle('ARTICLE');
+      //let isEditing = false;
 
-      handle
+      $d(
+`<article id="entry-${data.id}"><h3>
+<span id="title" on:edit="{$.updateEntry(${data.id}, 'title', editedValue)}">${data.title || ''}</span>
+<span class="icon i-edit" on:click="{$.editEntry(${data.id})}" title="Edit this entry"></span>
+<span class="icon i-delete" on:click="{$.removeEntry(${data.id}}" title="Delete this entry"></span>
+<span class="icon i-close" on:click="{$.toggleEntryVisibility(${data.id}, false)}" title="Close this entry"></span></h3>
+<div on:toggled-edit="{$.entryContent(${data.id}, isEditing, elm)}" text="{$.entryContent(${data.id})}"></div>
+<label>${new Date(data.id).toLocaleString('sv')}</label>
+</article>`)
+        .css('animationName', 'fadeOut')
+        .css('display', 'none')
+        .spawn(this.renderDOM);
+
+        /*handle
           .attr('id', 'entry-' + data.id)
           .css('animationName', 'fadeOut')
           .css('display', 'none')
-          .html(`<h3><span id="title">${data.title || ''}</span><span id="meta">(${data.id})</span><span class="icon i-edit" id="edit"></span><span class="icon i-delete" id="remove"></span><span class="icon i-close" id="close"></span></h3><div>${$.require('markdown').parse(this.encodeText(data.content))}</div>`)
+          .html(`<h3><span id="title">${data.title || ''}</span>
+            <span class="icon i-edit" id="edit"></span>
+            <span class="icon i-delete" id="remove"></span>
+            <span class="icon i-close" id="close"></span>
+            </h3><div>${$.require('markdown').parse(this.encodeText(data.content))}</div><label>${new Date(data.id).toLocaleString('sv')}</label>`)
           .query('h3>#close', h => h.on('click', event => this.toggleEntryVisibility(data.id, false)).tooltip('Close this entry'))
           .query('h3>#remove', h => h.on('click', event => this.removeEntry(data.id)).tooltip('Delete this entry'))
           .query('h3>#edit', h => h.on('click', event => { handle.fire('edit', isEditing, 'div'); isEditing = !isEditing; }).tooltip('Edit this entry'))
+          //.query('label', h => h.text('FOO'))
           .query('div', h => h.on('edit', event => {
             if (event.detail) {
               this.updateEntry(data.id, 'content', this.decodeText(h.get().innerText));
@@ -646,8 +858,25 @@ label[for=sidebar-toggle] {
             }
             h.attr('contentEditable', !event.detail);
           }))
-          .query('h3>#title', h => h.editable(data.id, 'title', (id, key, content) => this.updateEntry(id, key, content)))
-          .spawn(this.renderDOM);
+          .query('h3>#title', h => h.editable(data.id, 'title', (id, key, content) => this.updateEntry(id, key, content)));
+          //.spawn(this.renderDOM);*/
+    }
+
+    entryContent(id, isEditing, elm) {
+      let entry = $.entries.find(e => e.id === id);
+
+      if (entry) {
+        if (isEditing) {
+          return { text: this.encodeText(entry.content || '') };
+        } else {
+          if (isEditing !== undefined) {
+            this.updateEntry(id, 'content', this.decodeText(elm?.innerText));
+          }
+          return { html: $.require('markdown').parse(this.encodeText(entry.content || '')) };
+        }
+      } else {
+        return '???!';
+      }
     }
 
     decodeText(text) {
@@ -656,75 +885,6 @@ label[for=sidebar-toggle] {
 
     encodeText(text) {
       return (text || '').replaceAll('\\N','\n');
-    }
-
-    // TODO dom-util?
-    handle(elm) {
-      elm = typeof elm === 'string' ? document.createElement(elm) : elm;
-      const handler = {
-        // Converts 'elm' into a shadowed version. All actions following will apply on the shadow-dom.
-        shadowed    : () => { elm = elm.attachShadow({ mode: "open" }); return handler; },
-        // Copies one or more style-definitions into 'elm'. Each id will refer to a 'style'-block using that id.
-        attachStyles: (...styleIds) => {
-          styleIds.forEach(styleId => {
-            if (this.styles[styleId]) {
-              elm.appendChild(this.styles[styleId].cloneNode(true));
-            } else {
-              elm.appendChild(document.querySelector(`style[id=${styleId}]`).cloneNode(true))
-            }
-          });
-          return handler;
-        },
-        wrap        : (tag) => { let wrapper = document.createElement(tag); elm.parentNode ? elm.parentNode.appendChild(wrapper) : null; wrapper.appendChild(elm); elm = wrapper; return handler; },
-        // Sets an attribute on 'elm'.
-        attr        : (key, value) => { elm.setAttribute(key, value); return handler; },
-        // Applies 'str' as inner text to 'elm'.
-        text        : str => { elm.innerText = str; return handler; },
-        // Applies 'str' as inner HTML to 'elm'.
-        html        : str => { elm.innerHTML = str; return handler; },
-        // Fires a custom event.
-        fire        : (type, data, target) => { (target ? typeof target === 'string' ? elm.querySelector(target) : target : elm).dispatchEvent(new CustomEvent(type, { detail: data })); return handler; },
-        // Registering a listener for event 'type'.
-        on          : (type, listener) => { elm.addEventListener(type, event => listener(event, handler)); return handler; },
-        // Sets a single CSS-property. Note that you still need to use correct camel cased key (even as 'string').
-        css         : (prop, value) => { elm.style[prop] = value; return handler; },
-        class       : (...classes) => { classes.forEach(cls => elm.classList.add(cls)); return handler; },
-        // 'Spawns' this element as child in a 'target' (if target is not defined it will be document.body).
-        spawn       : (target) => { (target || document.body).appendChild(elm); return handler; },
-        // Removes this element from its parent (and DOM).
-        destroy     : () => { elm ? elm.remove() : null; return handler; },
-        // Simulates a 'click' on the element.
-        click       : () => { elm.click(); return handler; },
-        // Queries a single element with a selector and invokes a callback with the element wrapped in another handler.
-        query       : (selector, callback) => { callback(this.handle(elm.querySelector(selector))); return handler; },
-        // Makes the element editable.
-        editable    : (id, key, listener, viewHandler) => { this.makeEditable(elm, id, key, listener, viewHandler); return handler; },
-        append      : provider => { let child = provider(elm, handler); child = child instanceof HTMLElement ? child : child.get(); elm.appendChild(child); return handler; },
-        // Returns the element from this handler.
-        tooltip     : tooltip => { elm.setAttribute('title', tooltip || '???'); return handler; },
-        get         : () => elm
-      };
-      return handler;
-    }
-
-    // TODO dom-util?
-    makeEditable(elm, id, key, listener, viewHandler) {
-      elm.contentEditable = true;
-
-      if (viewHandler) {
-        elm.onfocus = event => viewHandler.startEdit ? elm.innerText = viewHandler.startEdit() : null;
-        elm.onblur = event => viewHandler.endEdit ? viewHandler.endEdit(elm.innerText, elm) : null;
-      } else {
-        elm.onfocus = event => elm.originContent = elm.innerHTML;
-        elm.onblur = event => {
-          if (elm.originContent != elm.innerHTML) {
-            if (listener) {
-              listener(id, key, elm.innerHTML);
-            }
-          }
-          delete elm.originContent;
-        };
-      }
     }
 
     updateView() {
@@ -739,12 +899,12 @@ label[for=sidebar-toggle] {
     }
 
     filterAndUpdateEntries() {
-      $entries
+      $.entries
         .forEach(entry => {
           const
-            idx = $editing.indexOf(entry.id),
+            idx = $.editing.indexOf(entry.id),
             elm = this.renderDOM.querySelector('#entry-' + entry.id),
-            state = (this.searchTerm ? (entry.title || '').toLowerCase().includes(this.searchTerm.toLowerCase()) : $editing.includes(entry.id)) ? 'fadeIn' : 'fadeOut';
+            state = (this.searchTerm ? (entry.title || '').toLowerCase().includes(this.searchTerm.toLowerCase()) : $.editing.includes(entry.id)) ? 'fadeIn' : 'fadeOut';
 
           if (state != elm.style.animationName) {
             if ('fadeIn' === state) {
@@ -766,27 +926,22 @@ label[for=sidebar-toggle] {
     }
 
     filterAndUpdateEntryKnobs() {
-      $entries
+      $.entries
         .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-        .forEach(entry => {
-          const elm = this.indexDOM.querySelector('#entry-knob-' + entry.id);
-          this.handle(elm)
+        .forEach(entry =>
+          $d(this.indexDOM.querySelector('#entry-knob-' + entry.id))
             .query('#title', h => h.text(entry.title || '(n/a)'))
-          // TODO to handler
-          elm.classList[$editing.includes(entry.id) ? 'add' : 'remove']('--visible');
-
-          // TODO BUG closing entries deletes them from index
-          // -------------------------------------------------- this.indexDOM.append(elm);
-        });
+            .toggle($.editing.includes(entry.id), '--visible'));
     }
 
     toggleEntryVisibility(id, isVisible) {
-      let idx = $editing.indexOf(id);
+      let idx = $.editing.indexOf(id);
+
       if (idx !== -1) {
-        $editing.splice(idx, 1);
+        $.editing.splice(idx, 1);
       }
       if (isVisible) {
-        $editing.unshift(id);
+        $.editing.unshift(id);
       }
 
       this.storeData();
@@ -794,8 +949,15 @@ label[for=sidebar-toggle] {
       this.filterAndUpdateEntryKnobs();
     }
 
+    editEntry(id) {
+      let elm = this.renderDOM.querySelector('#entry-' + id);
+      let div = elm.querySelector('div');
+
+      $e.fire('toggled-edit', div)
+    }
+
     addEntry(data) {
-      $entries.push(data);
+      $.entries.push(data);
 
       this.unsaved = true;
       this.updateView();
@@ -805,10 +967,10 @@ label[for=sidebar-toggle] {
     }
 
     removeEntry(id) {
-      $entries
+      $.entries
         .filter(entry => entry.id === id)
         .forEach(entry => {
-          const idx = $entries.indexOf(entry);
+          const idx = $.entries.indexOf(entry);
 
           if (idx !== -1) {
             const elmEntry = this.renderDOM.querySelector('#entry-' + entry.id);
@@ -820,10 +982,10 @@ label[for=sidebar-toggle] {
               elmEntry.remove();
               elmEntryKnob.remove();
 
-              $entries.splice(idx, 1);
+              $.entries.splice(idx, 1);
 
               this.updateView();
-              // TODO remove from $editing
+              // TODO remove from $.editing
               // TODO use this > toggleEntryVisibility   and remove the three lines below
               this.storeData()
               this.filterAndUpdateEntries();
@@ -834,7 +996,7 @@ label[for=sidebar-toggle] {
     }
 
     updateEntry(id, key, value) {
-      $entries
+      $.entries
           .filter(entry => entry.id === id)
           .forEach(entry => entry[key] = value);
       this.storeData();
@@ -845,11 +1007,10 @@ label[for=sidebar-toggle] {
      * Store all data into the data container (properties and entries).
      */
     storeData() {
-      this.dataCont.innerText = `const $properties = ${JSON.stringify($properties, undefined, 0).replace(/\\n/g, '')};const $editing = ${JSON.stringify($editing, undefined, 0)};const $entries = ${JSON.stringify($entries, undefined, 0).replace(/\\n/g, '')};`;
+      this.dataCont.innerText = `$.properties = ${JSON.stringify($.properties, undefined, 0).replace(/\\n/g, '')};$.editing = ${JSON.stringify($.editing, undefined, 0)};$.entries = ${JSON.stringify($.entries, undefined, 0).replace(/\\n/g, '')};`;
     }
   }
-
-const $ = new Core();
+  const $ = new Core();
 </script>
 
     <script id="script-md-parser">
@@ -927,7 +1088,7 @@ const $ = new Core();
 
       // We epxect that a property is defined by a colon followed by a space, otherwise it must
       //  be some kind of pseudo class or property or selector of any kind.
-      if (colonIdx != -1 && line.charAt(colonIdx + 1) === ' ') {
+      if (colonIdx != -1 && !line.startsWith('@') && line.charAt(colonIdx + 1) === ' ') {
         this.key = line.substring(0, colonIdx).trim();
         this.value = line.substring(colonIdx + 1).trim();
         this.isProperty = true;
@@ -978,7 +1139,7 @@ const $ = new Core();
       let containsSpacesOnly = lines.filter(line => !/^ *\S/.test(line)).length === 0;
       // Check if there are tabs used as indent (and only tabs).
       let containsTabsOnly = lines.filter(line => !/^\t*\S/.test(line)).length === 0;
-      // Check either tabs or spaces are used as indent.
+      // Check if either tabs or spaces are used as indent.
       let containsBoth = lines.some(line => !containsSpacesOnly && !containsTabsOnly && /^\W*\S/.test(line));
       let isValid = !containsBoth && (containsSpacesOnly || containsTabsOnly);
 
@@ -1108,9 +1269,9 @@ const $ = new Core();
 </script>
 
     <script id="database">
-      const $properties = {projectName: "Wik'ed-Project", topic: "Topic title", autosave: ""};
-      const $editing = [0, 1];
-      const $entries = [{"id":0,"title":"Welcome","content":
+      $.properties = {projectName: "Wik'ed-Project", topic: "Topic title"};
+      $.editing = [0, 1];
+      $.entries = [{"id":0,"title":"Welcome","content":
         'This is a self-contained, wiki-like page which you can use as notepad, knowledgebase or similar.\\N' +
         'Due to its nature you can save/backup your work by saving the page itself, as it contains all current data and all functionality.\\N' +
         'To save the page use the \'save\' button and not the \'Save page\'-option of your browser (that will break your page).'
@@ -1125,7 +1286,7 @@ const $ = new Core();
         '[[ Boxed Content'
       }];
     </script>
-    <title></title>
+    <!--title></title-->
   </head>
   <body>
     <input type="checkbox" id="sidebar-toggle" hidden>

@@ -1,6 +1,6 @@
 <script id="script-md-parser">
   // Register module.
-  ($$?.modules||{})['markdown'] = class MDParser {
+  ($?.modules||{})['markdown'] = class MDParser {
     static replace(regex, text, start, end, startCrop, endCrop) {
       let output = text;
       // Get all matches for 'regex'.

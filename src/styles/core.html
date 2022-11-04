@@ -1,7 +1,10 @@
 <style id="style-core">
 :root{
+  --hPrimary: 60deg;
+  --colPrimaryHSL: var(--hPrimary) 100% 50%;
+  --colPrimaryLightHSL: var(--hPrimary) 75% 50%;
   --sizeSidebar: min(80vw, 300px);
-  --sizeSidebarHeader: 32px;
+  --sizeSidebarHeader: 48px;
 }
 *{
   box-sizing: border-box;
@@ -53,7 +56,7 @@ label[for=sidebar-toggle] {
   backdrop-filter: blur(.5em);
 }
 #render{
-  --padding: 2em;
+  --padding: 0em;
   transition: all .5s;
   width: calc(100% - var(--padding));
   transform: translateX(var(--padding));
@@ -90,6 +93,14 @@ label[for=sidebar-toggle] {
 #sidebar-toggle:checked ~ #sidebar {
   transform: translateX(0);
   box-shadow: 0 0 1.5em hsl(0deg 0% 0% / .125);
+}
+@media (min-width: 576px) {
+  :root {
+    --sizeSidebarHeader: 32px;
+  }
+  #render{
+    --padding: 2em;
+  }
 }
 
 @media (min-width: 576px) {

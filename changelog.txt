@@ -1,0 +1,14 @@
+2022.11.03
+  - Extracted DOM-utilities function into own module (dom-uil.html)
+  - Added templating
+    - Writing HTML-code directly
+    - Added event-handling like 'on:click' as HTML-attribute
+    - Added setting node content by using 'text="..."' as HTML-attribute
+    - Added support for JS-variables and functions in HTML-attributes or text nodes
+  - Improved CSS-styling
+    - Defined more CSS-custom-properties
+  - Added event emitter for global events
+  - Minor styling improvements
+  - Bug-fixing
+    - Fixed issue that entry knob was removed from DOM when activating it
+    - Fixed bug in CCSS-parser using media-queries
