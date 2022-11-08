@@ -1,4 +1,4 @@
-# Wiki'ed ('wikified' / 'wicked')
+# Wik'ed ('wikified' / 'wicked')
 
 ## What it is
 A single page(-application) that either contains the functionality and the data of a wiki-editor. Just by saving the page the whole wiki-editor can be backuped and/or shared in a whole.
